@@ -1,0 +1,19 @@
+[project]
+name = "suprsend-agents"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.3.0"]
+mcp = ["mcp>=1.0.0"]
+
+[build-system]
+requires = ["setuptools>=73.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]

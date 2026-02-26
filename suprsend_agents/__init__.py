@@ -1,0 +1,130 @@
+from suprsend_agents.auth import ServiceTokenAuth, JWTAuth
+from suprsend_agents.client import AsyncSuprSendClient
+from suprsend_agents.context import ToolContext
+from suprsend_agents.types import Permissions
+from suprsend_agents.tools.resolve_workspace import ResolveWorkspaceTool
+from suprsend_agents.tools.search_docs import SearchDocsTool
+from suprsend_agents.tools.users import GetUserTool, GetUserPreferenceTool
+from suprsend_agents.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
+
+__all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
+
+# Tool registry — keyed by tool name.
+# resolve_workspace is NOT here; it is always prepended unconditionally.
+# Tools with no permission_category (search_docs, guardrail) are always included.
+_ALL_TOOLS: dict[str, type] = {
+    "search_suprsend_docs": SearchDocsTool,
+    # users
+    "get_user": GetUserTool,
+    "get_user_preference": GetUserPreferenceTool,
+    # objects
+    "get_object": GetObjectTool,
+    "get_object_preference": GetObjectPreferenceTool,
+    "get_object_subscriptions": GetObjectSubscriptionsTool,
+    # coming soon:
+    # "guardrail":          GuardrailTool,          no permission (always included)
+    # "trigger_workflow":   TriggerWorkflowTool,    permission_category="workflows", operation="trigger"
+    # "list_workflows":     ListWorkflowsTool,      permission_category="workflows", operation="read"
+    # "upsert_subscriber":  UpsertSubscriberTool,   permission_category="subscribers", operation="manage"
+    # "track_event":        TrackEventTool,         permission_category="events", operation="manage"
+    # "list_tenants":       ListTenantsTool,        permission_category="tenants", operation="read"
+}
+
+
+def _is_permitted(tool_cls: type, permissions: Permissions | None) -> bool:
+    """
+    Returns True if the tool should be included given the permissions config.
+
+    Rules:
+    - No permission_category declared → always included (guardrail, search_docs, etc.)
+    - No permissions config on toolkit → all tools included
+    - permission_category + operation both present → check the config
+    """
+    category = getattr(tool_cls, "permission_category", None)
+    operation = getattr(tool_cls, "permission_operation", None)
+
+    if not category or not operation:
+        return True  # no permission gate — always included
+
+    if permissions is None:
+        return True  # no restrictions configured — everything allowed
+
+    cat_perms = permissions.get(category, {})
+    return bool(cat_perms.get(operation, False))
+
+
+class SuprSendToolkit:
+    """
+    Main entry point.
+
+        toolkit = SuprSendToolkit(
+            service_token="sst_...",
+            context=ToolContext(workspace="acme", tenant_id="acme-prod"),
+            permissions=Permissions(
+                workflows={"read": True, "trigger": True},
+                subscribers={"read": True, "manage": True},
+            ),
+        )
+
+        # LangChain / LangGraph
+        # resolve_workspace is always first; only permitted tools follow
+        tools = toolkit.get_langchain_tools()
+
+        # OpenAI / Anthropic
+        tool_defs = toolkit.get_openai_tools()
+
+    Args:
+        service_token:  Service token from the SuprSend dashboard.
+        context:        ToolContext — workspace slug, URLs, tenant default.
+                        Stored on the client; tools access it via client.context.
+        permissions:    Which tool categories and operations to expose.
+                        When omitted, all registered tools are included.
+        auth:           Override with JWTAuth for per-user flows outside LangGraph.
+    """
+
+    def __init__(
+        self,
+        service_token: str | None = None,
+        context: ToolContext | None = None,
+        permissions: Permissions | None = None,
+        auth: ServiceTokenAuth | JWTAuth | None = None,
+    ) -> None:
+        if auth:
+            _auth = auth
+        elif service_token:
+            _auth = ServiceTokenAuth(service_token)
+        else:
+            raise ValueError("Provide service_token= or auth=.")
+
+        _ctx = context or ToolContext()
+        self._client = AsyncSuprSendClient(auth=_auth, context=_ctx)
+        self._permissions = permissions
+
+    def _permitted_names(self, requested: list[str] | None) -> list[str]:
+        """Names from the requested list (or all) that pass the permission check."""
+        names = requested or list(_ALL_TOOLS.keys())
+        return [
+            n for n in names
+            if _is_permitted(_ALL_TOOLS[n], self._permissions)
+        ]
+
+    def _instantiate(self, name: str) -> object:
+        return _ALL_TOOLS[name](client=self._client)
+
+    def get_langchain_tools(self, tools: list[str] | None = None) -> list:
+        """
+        LangChain BaseTool list.
+        resolve_workspace is always first.
+        All other tools are filtered by the permissions config.
+        """
+        instances = [ResolveWorkspaceTool(client=self._client)] + [
+            self._instantiate(n) for n in self._permitted_names(tools)
+        ]
+        return [t.to_langchain() for t in instances]
+
+    def get_openai_tools(self, tools: list[str] | None = None) -> list:
+        """OpenAI / Anthropic function-calling dicts."""
+        instances = [ResolveWorkspaceTool(client=self._client)] + [
+            self._instantiate(n) for n in self._permitted_names(tools)
+        ]
+        return [t.to_openai() for t in instances]
