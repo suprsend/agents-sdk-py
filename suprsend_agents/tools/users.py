@@ -1,8 +1,24 @@
 import json
+import os
 import logging
 from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
+
+_DEBUG_LOG = os.path.join(os.path.dirname(__file__), "debug.log")
+
+def _debug(msg: str) -> None:
+    import sys
+    from datetime import datetime
+    line = f"{datetime.utcnow().isoformat()} {msg}\n"
+    print(line, flush=True)
+    sys.stderr.write(line)
+    sys.stderr.flush()
+    try:
+        with open(_DEBUG_LOG, "a") as f:
+            f.write(line)
+    except Exception:
+        pass
 
 from pydantic import BaseModel, Field
 
@@ -55,12 +71,12 @@ class GetUserTool(SuprSendTool):
         try:
             path = f"v1/user/{quote(distinct_id, safe='')}/"
             url = f"{client.base_url}/{path}"
-            print(f"[suprsend][get_user] workspace={ws} url={url} auth={type(client.auth).__name__}", flush=True)
+            _debug(f"[get_user] workspace={ws} url={url} auth={type(client.auth).__name__}")
             result = await client.workspace_get(ws, path)
-            print(f"[suprsend][get_user] success", flush=True)
+            _debug("[get_user] success")
             return json.dumps(result, indent=2)
         except Exception as e:
-            print(f"[suprsend][get_user] error: {e}", flush=True)
+            _debug(f"[get_user] error: {e}")
             return f"Error fetching user '{distinct_id}': {e}"
 
 
