@@ -4,12 +4,9 @@ import base64
 import hashlib
 import hmac
 import json
-import logging
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from typing import Any, TYPE_CHECKING
-
-logger = logging.getLogger(__name__)
 
 import aiohttp
 
@@ -101,10 +98,8 @@ class AsyncSuprSendClient:
         headers = self.auth.get_headers()
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, params=params) as resp:
-                body = await resp.text()
-                print(f"[suprsend][get] {url} status={resp.status} body={body[:500]}", flush=True)
                 resp.raise_for_status()
-                return json.loads(body)
+                return await resp.json()
 
     async def post(self, url: str, payload: dict | None = None) -> Any:
         body = json.dumps(payload or {}).encode()
@@ -129,9 +124,7 @@ class AsyncSuprSendClient:
         if workspace in self._workspace_cache:
             return self._workspace_cache[workspace]
 
-        url = f"{self.base_url}/v1/{workspace}/ws_key/bridge"
-        print(f"[suprsend][exchange] GET {url} auth={type(self.auth).__name__}", flush=True)
-        print(f"[suprsend][exchange] request_headers={self.auth.get_headers()}", flush=True)
+        url = f"{self.mgmnt_url}/v1/{workspace}/ws_key/bridge"
         result = await self.get(url)
         key = result["key"]
         secret = result["secret"]
@@ -151,14 +144,10 @@ class AsyncSuprSendClient:
         full_path = f"/{path.lstrip('/')}"
         headers = _hmac_headers(key, secret, "GET", full_path, b"")
         url = f"{self.base_url}{full_path}"
-        print(f"[suprsend][workspace_get] GET {url} params={params}", flush=True)
-        print(f"[suprsend][workspace_get] request_headers={headers}", flush=True)
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, params=params) as resp:
-                body = await resp.text()
-                print(f"[suprsend][workspace_get] status={resp.status} body={body[:500]}", flush=True)
                 resp.raise_for_status()
-                return json.loads(body)
+                return await resp.json()
 
     async def workspace_post(
         self,
