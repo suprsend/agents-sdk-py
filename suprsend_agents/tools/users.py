@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
-_DEBUG_LOG = os.path.join(os.path.dirname(__file__), "debug.log")
+_DEBUG_LOG = "/tmp/suprsend_debug.log"
 
 def _debug(msg: str) -> None:
     import sys
