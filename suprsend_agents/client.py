@@ -4,9 +4,12 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from typing import Any, TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 import aiohttp
 
@@ -98,8 +101,11 @@ class AsyncSuprSendClient:
         headers = self.auth.get_headers()
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, params=params) as resp:
+                body = await resp.text()
+                logger.info("[get] %s status=%s body=%s", url, resp.status, body[:500])
+                print(f"[get] {url} status={resp.status} body={body[:500]}")
                 resp.raise_for_status()
-                return await resp.json()
+                return json.loads(body)
 
     async def post(self, url: str, payload: dict | None = None) -> Any:
         body = json.dumps(payload or {}).encode()
@@ -125,6 +131,10 @@ class AsyncSuprSendClient:
             return self._workspace_cache[workspace]
 
         url = f"{self.base_url}/v1/{workspace}/ws_key/bridge"
+        logger.info("[exchange] GET %s auth=%s", url, type(self.auth).__name__)
+        logger.info("[exchange] headers=%s", self.auth.get_headers())
+        print(f"[exchange] GET {url} auth={type(self.auth).__name__}")
+        print(f"[exchange] headers={self.auth.get_headers()}")
         result = await self.get(url)
         key = result["key"]
         secret = result["secret"]
@@ -144,10 +154,17 @@ class AsyncSuprSendClient:
         full_path = f"/{path.lstrip('/')}"
         headers = _hmac_headers(key, secret, "GET", full_path, b"")
         url = f"{self.base_url}{full_path}"
+        logger.info("[workspace_get] GET %s params=%s", url, params)
+        logger.info("[workspace_get] headers=%s", headers)
+        print(f"[workspace_get] GET {url} params={params}")
+        print(f"[workspace_get] headers={headers}")
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, params=params) as resp:
+                body = await resp.text()
+                logger.info("[workspace_get] status=%s body=%s", resp.status, body[:500])
+                print(f"[workspace_get] status={resp.status} body={body[:500]}")
                 resp.raise_for_status()
-                return await resp.json()
+                return json.loads(body)
 
     async def workspace_post(
         self,

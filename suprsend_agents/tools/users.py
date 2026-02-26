@@ -1,5 +1,8 @@
 import json
+import logging
 from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -51,9 +54,16 @@ class GetUserTool(SuprSendTool):
 
         try:
             path = f"v1/user/{quote(distinct_id, safe='')}/"
+            url = f"{client.base_url}/{path}"
+            logger.info("[get_user] workspace=%s url=%s auth=%s", ws, url, type(client.auth).__name__)
+            print(f"[get_user] workspace={ws} url={url} auth={type(client.auth).__name__}")
             result = await client.workspace_get(ws, path)
+            logger.info("[get_user] success")
+            print(f"[get_user] success: {json.dumps(result, indent=2)[:200]}")
             return json.dumps(result, indent=2)
         except Exception as e:
+            logger.error("[get_user] error: %s", e)
+            print(f"[get_user] error: {e}")
             return f"Error fetching user '{distinct_id}': {e}"
 
 
