@@ -44,8 +44,8 @@ class SuprSendTool(ABC):
         tenant_id  → kwargs["tenant_id"]  or  client.context.tenant_id  or  "default"
 
     ── JWT override (copilot) ────────────────────────────────────────────────
-    _resolve_client() swaps ServiceTokenAuth → JWTAuth at call time when
-    LangGraph injects jwt_token via config.configurable.
+    _resolve_client() swaps ServiceTokenAuth → JWTAuth at call time by
+    calling jwt_getter() (a ContextVar set by the auth middleware).
     """
 
     name: str
@@ -79,17 +79,14 @@ class SuprSendTool(ABC):
         """
         Return the right HTTP client for this specific tool invocation.
 
-        Priority:
-          1. jwt_token in config.configurable  →  JWTAuth  (explicit per-run)
-          2. client.jwt_getter()               →  JWTAuth  (host auth middleware)
-          3. _client from construction          →  ServiceTokenAuth (default)
+        If the toolkit was constructed with jwt_getter, call it now to get
+        the current request's JWT (set by the auth middleware via ContextVar).
+        Falls back to the construction-time auth (service token) if no JWT.
         """
-        configurable = (config or {}).get("configurable") or {}
-        jwt_token = configurable.get("jwt_token")
-        if not jwt_token and self._client.jwt_getter:
+        if self._client.jwt_getter:
             jwt_token = self._client.jwt_getter()
-        if jwt_token:
-            return self._client._with_jwt(jwt_token)
+            if jwt_token:
+                return self._client._with_jwt(jwt_token)
         return self._client
 
     # ── Core logic (subclasses implement) ─────────────────────────────────────

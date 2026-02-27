@@ -80,7 +80,12 @@ class SuprSendToolkit:
                         Stored on the client; tools access it via client.context.
         permissions:    Which tool categories and operations to expose.
                         When omitted, all registered tools are included.
-        auth:           Override with JWTAuth for per-user flows outside LangGraph.
+        auth:           Override with a concrete auth object (e.g. JWTAuth) instead
+                        of a service token.
+        jwt_getter:     Callable that returns the current JWT at tool call time.
+                        Use for in-process LangGraph deployments where the JWT lives
+                        in a ContextVar set by the auth middleware (e.g. copilot).
+                        Mutually exclusive with service_token / auth.
     """
 
     def __init__(
@@ -95,8 +100,10 @@ class SuprSendToolkit:
             _auth = auth
         elif service_token:
             _auth = ServiceTokenAuth(service_token)
+        elif jwt_getter:
+            _auth = None  # auth resolved per-call via jwt_getter
         else:
-            raise ValueError("Provide service_token= or auth=.")
+            raise ValueError("Provide service_token=, auth=, or jwt_getter=.")
 
         _ctx = context or ToolContext()
         self._client = AsyncSuprSendClient(auth=_auth, context=_ctx, jwt_getter=jwt_getter)

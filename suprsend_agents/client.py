@@ -37,7 +37,7 @@ class AsyncSuprSendClient:
 
     def __init__(
         self,
-        auth: SuprSendAuth,
+        auth: SuprSendAuth | None,
         context: "ToolContext",
         jwt_getter: Callable[[], str] | None = None,
     ) -> None:
@@ -57,11 +57,7 @@ class AsyncSuprSendClient:
         Shares the same context and _workspace_cache as the parent so an
         exchange already performed is not repeated.
         """
-        new = AsyncSuprSendClient(
-            auth=JWTAuth(jwt_token),
-            context=self.context,
-            jwt_getter=self.jwt_getter,
-        )
+        new = AsyncSuprSendClient(auth=JWTAuth(jwt_token), context=self.context, jwt_getter=self.jwt_getter)
         new._workspace_cache = self._workspace_cache
         new._session = self._session  # share the connection pool
         return new
