@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any, TYPE_CHECKING
 
 import aiohttp
 
 from suprsend_agents.auth import SuprSendAuth, JWTAuth
+
+_WORKSPACE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 if TYPE_CHECKING:
     from suprsend_agents.context import ToolContext
@@ -66,7 +69,9 @@ class AsyncSuprSendClient:
 
     def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=60)
+            )
         return self._session
 
     async def get(self, url: str, params: dict | None = None) -> Any:
@@ -94,6 +99,9 @@ class AsyncSuprSendClient:
         Returns (workspace_key, workspace_secret).
         Result is cached — only one network call per workspace per lifetime.
         """
+        if not workspace or not _WORKSPACE_RE.match(workspace):
+            raise ValueError(f"Invalid workspace slug: {workspace!r}")
+
         if workspace in self._workspace_cache:
             return self._workspace_cache[workspace]
 

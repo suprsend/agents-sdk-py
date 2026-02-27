@@ -74,7 +74,7 @@ class JWTAuth(SuprSendAuth):
         parts = authorization_header.strip().split()
         if len(parts) == 2 and parts[0].lower() == "bearer":
             return cls(token=parts[1])
-        raise ValueError(f"Expected 'Bearer <token>', got: {authorization_header!r}")
+        raise ValueError("Invalid Authorization header format. Expected: 'Bearer <token>'.")
 
     @classmethod
     def from_cookie(cls, cookie_header: str, cookie_name: str) -> "JWTAuth":
@@ -96,9 +96,7 @@ class JWTAuth(SuprSendAuth):
         }
         token = cookies.get(cookie_name)
         if not token:
-            raise ValueError(
-                f"Cookie '{cookie_name}' not found. Available: {list(cookies.keys())}"
-            )
+            raise ValueError(f"Cookie '{cookie_name}' not found.")
         return cls(token=unquote(token))
 
     @classmethod

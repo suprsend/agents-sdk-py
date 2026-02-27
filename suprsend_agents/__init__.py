@@ -85,7 +85,8 @@ class SuprSendToolkit:
         jwt_getter:     Callable that returns the current JWT at tool call time.
                         Use for in-process LangGraph deployments where the JWT lives
                         in a ContextVar set by the auth middleware (e.g. copilot).
-                        Mutually exclusive with service_token / auth.
+                        When combined with service_token, JWT is preferred and
+                        service token acts as fallback when jwt_getter returns empty.
     """
 
     def __init__(
