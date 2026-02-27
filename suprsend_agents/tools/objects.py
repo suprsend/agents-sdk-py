@@ -1,5 +1,5 @@
+import asyncio
 import json
-from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
@@ -56,8 +56,8 @@ class GetObjectTool(SuprSendTool):
             return "Error: object_id is required."
 
         try:
-            path = f"v1/object/{quote(object_type, safe='')}/{quote(object_id, safe='')}/"
-            result = await client.workspace_get(ws, path)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.objects.get, object_type, object_id)
             return json.dumps(result, indent=2)
         except Exception as e:
             return f"Error fetching object '{object_type}/{object_id}': {e}"
@@ -129,15 +129,16 @@ class GetObjectPreferenceTool(SuprSendTool):
             return "Error: object_id is required."
 
         try:
-            object_path = f"v1/object/{quote(object_type, safe='')}/{quote(object_id, safe='')}/"
-            params = {"tenant_id": tenant} if tenant else {}
-
+            sdk = await client.get_sdk_instance(ws)
+            options = {"tenant_id": tenant} if tenant else {}
             if category:
-                path = f"{object_path}preference/category/{quote(category, safe='')}/"
+                result = await asyncio.to_thread(
+                    sdk.objects.get_category_preference, object_type, object_id, category, options or None
+                )
             else:
-                path = f"{object_path}preference/"
-
-            result = await client.workspace_get(ws, path, params=params)
+                result = await asyncio.to_thread(
+                    sdk.objects.get_full_preference, object_type, object_id, options or None
+                )
             return json.dumps(result, indent=2)
         except Exception as e:
             return f"Error fetching preferences for object '{object_type}/{object_id}': {e}"
@@ -204,12 +205,14 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             return "Error: object_id is required."
 
         try:
-            path = f"v1/object/{quote(object_type, safe='')}/{quote(object_id, safe='')}/subscription/"
-            params: dict = {"limit": limit}
+            options: dict = {"limit": limit}
             if cursor:
-                params["cursor"] = cursor
+                options["cursor"] = cursor
 
-            result = await client.workspace_get(ws, path, params=params)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.objects.get_subscriptions, object_type, object_id, options
+            )
             return json.dumps(result, indent=2)
         except Exception as e:
             return f"Error fetching subscriptions for object '{object_type}/{object_id}': {e}"

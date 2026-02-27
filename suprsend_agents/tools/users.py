@@ -1,5 +1,5 @@
+import asyncio
 import json
-from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
@@ -50,8 +50,8 @@ class GetUserTool(SuprSendTool):
             return "Error: distinct_id is required."
 
         try:
-            path = f"v1/user/{quote(distinct_id, safe='')}/"
-            result = await client.workspace_get(ws, path)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.users.get, distinct_id)
             return json.dumps(result, indent=2)
         except Exception as e:
             return f"Error fetching user '{distinct_id}': {e}"
@@ -117,15 +117,16 @@ class GetUserPreferenceTool(SuprSendTool):
             return "Error: distinct_id is required."
 
         try:
-            user_path = f"v1/user/{quote(distinct_id, safe='')}/"
-            params = {"tenant_id": tenant} if tenant else {}
-
+            sdk = await client.get_sdk_instance(ws)
+            options = {"tenant_id": tenant} if tenant else {}
             if category:
-                path = f"{user_path}preference/category/{quote(category, safe='')}/"
+                result = await asyncio.to_thread(
+                    sdk.users.get_category_preference, distinct_id, category, options or None
+                )
             else:
-                path = f"{user_path}preference/"
-
-            result = await client.workspace_get(ws, path, params=params)
+                result = await asyncio.to_thread(
+                    sdk.users.get_full_preference, distinct_id, options or None
+                )
             return json.dumps(result, indent=2)
         except Exception as e:
             return f"Error fetching preferences for user '{distinct_id}': {e}"
