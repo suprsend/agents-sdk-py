@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Any
 from suprsend_agents.auth import ServiceTokenAuth, JWTAuth
 from suprsend_agents.client import AsyncSuprSendClient
 from suprsend_agents.context import ToolContext
@@ -82,11 +83,12 @@ class SuprSendToolkit:
                         When omitted, all registered tools are included.
         auth:           Override with a concrete auth object (e.g. JWTAuth) instead
                         of a service token.
-        jwt_getter:     Callable that returns the current JWT at tool call time.
-                        Use for in-process LangGraph deployments where the JWT lives
-                        in a ContextVar set by the auth middleware (e.g. copilot).
-                        When combined with service_token, JWT is preferred and
-                        service token acts as fallback when jwt_getter returns empty.
+        jwt_getter:     Callable[[run_config], str] called at tool invocation time.
+                        Receives the run config and returns the JWT string (or
+                        "" to fall back to service token). The host application owns
+                        all framework-specific extraction logic (ContextVar, LangGraph
+                        auth context, etc.). When combined with service_token, service
+                        token is the fallback if jwt_getter returns empty.
     """
 
     def __init__(
@@ -95,7 +97,7 @@ class SuprSendToolkit:
         context: ToolContext | None = None,
         permissions: Permissions | None = None,
         auth: ServiceTokenAuth | JWTAuth | None = None,
-        jwt_getter: "Callable[[], str] | None" = None,
+        jwt_getter: "Callable[[Any], str] | None" = None,
     ) -> None:
         if auth:
             _auth = auth

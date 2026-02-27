@@ -45,7 +45,8 @@ class SuprSendTool(ABC):
 
     ── JWT override (copilot) ────────────────────────────────────────────────
     _resolve_client() swaps ServiceTokenAuth → JWTAuth at call time by
-    calling jwt_getter() (a ContextVar set by the auth middleware).
+    calling jwt_getter(config). The host application provides the callable
+    and owns all framework-specific extraction logic.
     """
 
     name: str
@@ -75,16 +76,19 @@ class SuprSendTool(ABC):
 
     # ── Auth resolution ───────────────────────────────────────────────────────
 
-    def _resolve_client(self, config: Any) -> Any:
+    def _resolve_client(self, run_config: Any) -> Any:
         """
         Return the right HTTP client for this specific tool invocation.
 
-        If the toolkit was constructed with jwt_getter, call it now to get
-        the current request's JWT (set by the auth middleware via ContextVar).
+        If the toolkit was constructed with jwt_getter, call it now with the
+        current run config. The callable is fully owned by the host
+        application — it can read from a ContextVar, LangGraph's auth context,
+        or any other request-scoped source.
+
         Falls back to the construction-time auth (service token) if no JWT.
         """
         if self._client.jwt_getter:
-            jwt_token = self._client.jwt_getter()
+            jwt_token = self._client.jwt_getter(run_config)
             if jwt_token:
                 return self._client._with_jwt(jwt_token)
         return self._client
@@ -109,15 +113,15 @@ class SuprSendTool(ABC):
     def to_langchain(self) -> Any:
         """
         Return a LangChain StructuredTool.
-        config: RunnableConfig causes LangGraph to inject per-request config
-        at every call, enabling the JWT swap without changes in execute().
+        run_config: RunnableConfig is injected by LangGraph at every call,
+        enabling the JWT swap without changes in execute().
         """
         from langchain_core.tools import StructuredTool
 
         tool_self = self
 
-        async def _run(config: RunnableConfig, **kwargs: Any) -> str:
-            client = tool_self._resolve_client(config)
+        async def _run(run_config: RunnableConfig, **kwargs: Any) -> str:
+            client = tool_self._resolve_client(run_config)
             return await tool_self.execute(client=client, **kwargs)
 
         return StructuredTool.from_function(
