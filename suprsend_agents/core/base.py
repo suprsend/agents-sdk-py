@@ -80,11 +80,14 @@ class SuprSendTool(ABC):
         Return the right HTTP client for this specific tool invocation.
 
         Priority:
-          1. jwt_token in config.configurable  →  JWTAuth  (copilot)
-          2. _client from construction          →  ServiceTokenAuth (default)
+          1. jwt_token in config.configurable  →  JWTAuth  (explicit per-run)
+          2. client.jwt_getter()               →  JWTAuth  (host auth middleware)
+          3. _client from construction          →  ServiceTokenAuth (default)
         """
         configurable = (config or {}).get("configurable") or {}
         jwt_token = configurable.get("jwt_token")
+        if not jwt_token and self._client.jwt_getter:
+            jwt_token = self._client.jwt_getter()
         if jwt_token:
             return self._client._with_jwt(jwt_token)
         return self._client

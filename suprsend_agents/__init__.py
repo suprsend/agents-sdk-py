@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from suprsend_agents.auth import ServiceTokenAuth, JWTAuth
 from suprsend_agents.client import AsyncSuprSendClient
 from suprsend_agents.context import ToolContext
@@ -88,6 +89,7 @@ class SuprSendToolkit:
         context: ToolContext | None = None,
         permissions: Permissions | None = None,
         auth: ServiceTokenAuth | JWTAuth | None = None,
+        jwt_getter: "Callable[[], str] | None" = None,
     ) -> None:
         if auth:
             _auth = auth
@@ -97,7 +99,7 @@ class SuprSendToolkit:
             raise ValueError("Provide service_token= or auth=.")
 
         _ctx = context or ToolContext()
-        self._client = AsyncSuprSendClient(auth=_auth, context=_ctx)
+        self._client = AsyncSuprSendClient(auth=_auth, context=_ctx, jwt_getter=jwt_getter)
         self._permissions = permissions
 
     def _permitted_names(self, requested: list[str] | None) -> list[str]:

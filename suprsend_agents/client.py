@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any, TYPE_CHECKING
 
 import aiohttp
@@ -34,11 +35,17 @@ class AsyncSuprSendClient:
         # sdk.users.get(distinct_id), sdk.objects.get_full_preference(...), etc.
     """
 
-    def __init__(self, auth: SuprSendAuth, context: "ToolContext") -> None:
+    def __init__(
+        self,
+        auth: SuprSendAuth,
+        context: "ToolContext",
+        jwt_getter: Callable[[], str] | None = None,
+    ) -> None:
         self.auth = auth
         self.context = context
         self.base_url = context.base_url.rstrip("/")
         self.mgmnt_url = context.mgmnt_url.rstrip("/")
+        self.jwt_getter = jwt_getter
         # workspace slug → (key, secret) — populated by exchange_workspace_credentials
         self._workspace_cache: dict[str, tuple[str, str]] = {}
 
@@ -51,6 +58,7 @@ class AsyncSuprSendClient:
         new = AsyncSuprSendClient(
             auth=JWTAuth(jwt_token),
             context=self.context,
+            jwt_getter=self.jwt_getter,
         )
         new._workspace_cache = self._workspace_cache
         return new
