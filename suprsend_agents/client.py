@@ -48,6 +48,8 @@ class AsyncSuprSendClient:
         self.jwt_getter = jwt_getter
         # workspace slug → (key, secret) — populated by exchange_workspace_credentials
         self._workspace_cache: dict[str, tuple[str, str]] = {}
+        # Persistent session — created lazily, shared with _with_jwt() children
+        self._session: aiohttp.ClientSession | None = None
 
     def _with_jwt(self, jwt_token: str) -> "AsyncSuprSendClient":
         """
@@ -61,24 +63,28 @@ class AsyncSuprSendClient:
             jwt_getter=self.jwt_getter,
         )
         new._workspace_cache = self._workspace_cache
+        new._session = self._session  # share the connection pool
         return new
 
     # ── Low-level helpers ─────────────────────────────────────────────────────
 
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
     async def get(self, url: str, params: dict | None = None) -> Any:
         headers = self.auth.get_headers()
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, params=params) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        async with self._get_session().get(url, headers=headers, params=params) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     async def post(self, url: str, payload: dict | None = None) -> Any:
         body = json.dumps(payload or {}).encode()
         headers = self.auth.get_headers()
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=body, headers=headers) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        async with self._get_session().post(url, data=body, headers=headers) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
     # ── Exchange ──────────────────────────────────────────────────────────────
 

@@ -1,3 +1,7 @@
+import asyncio
+
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 from pydantic import BaseModel, Field
 
 from suprsend_agents.client import AsyncSuprSendClient
@@ -5,6 +9,29 @@ from suprsend_agents.core.base import SuprSendTool
 
 MINTLIFY_MCP_URL = "https://docs.suprsend.com/mcp"
 MCP_TOOL_NAME = "SearchSuprSendNotification"
+
+
+def _run_mcp_search(query: str) -> str:
+    """
+    Runs the MCP search in its own event loop.
+    Called via asyncio.to_thread() to keep blocking MCP transport calls
+    off the main event loop.
+    """
+    async def _call():
+        async with streamable_http_client(MINTLIFY_MCP_URL) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(MCP_TOOL_NAME, {"query": query})
+                if result.content:
+                    text_parts = [c.text for c in result.content if hasattr(c, "text")]
+                    return "\n".join(text_parts) if text_parts else "No results found."
+                return "No results found."
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_call())
+    finally:
+        loop.close()
 
 
 class SearchDocsInput(BaseModel):
@@ -37,18 +64,6 @@ class SearchDocsTool(SuprSendTool):
             return "Invalid query provided."
 
         try:
-            from mcp import ClientSession
-            from mcp.client.streamable_http import streamablehttp_client
-
-            async with streamablehttp_client(MINTLIFY_MCP_URL) as (read, write, _):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(MCP_TOOL_NAME, {"query": query})
-
-                    if result.content:
-                        text_parts = [c.text for c in result.content if hasattr(c, "text")]
-                        return "\n".join(text_parts) if text_parts else "No results found."
-                    return "No results found."
-
+            return await asyncio.to_thread(_run_mcp_search, query)
         except Exception as e:
             return f"Error searching docs: {e}"
