@@ -117,6 +117,8 @@ context = ToolContext(
 | `get_object` | Get object profile and channel identities | `subscribers.read` |
 | `get_object_preference` | Get notification preferences for an object | `subscribers.read` |
 | `get_object_subscriptions` | List subscribers for an object | `subscribers.read` |
+| `get_tenant` | Get tenant profile, branding, and settings | `tenants.read` |
+| `get_tenant_preference` | Get all notification category preferences for a tenant | `tenants.read` |
 
 ### Selecting Tools
 
@@ -140,6 +142,7 @@ toolkit = SuprSendToolkit(
     context=context,
     permissions=Permissions(
         subscribers={"read": True},
+        tenants={"read": True},
     ),
 )
 ```
