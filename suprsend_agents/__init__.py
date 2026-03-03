@@ -8,6 +8,7 @@ from suprsend_agents.tools.resolve_workspace import ResolveWorkspaceTool
 from suprsend_agents.tools.search_docs import SearchDocsTool
 from suprsend_agents.tools.users import GetUserTool, GetUserPreferenceTool
 from suprsend_agents.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
+from suprsend_agents.tools.tenants import GetTenantTool, GetTenantPreferenceTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 
@@ -23,13 +24,15 @@ _ALL_TOOLS: dict[str, type] = {
     "get_object": GetObjectTool,
     "get_object_preference": GetObjectPreferenceTool,
     "get_object_subscriptions": GetObjectSubscriptionsTool,
+    # tenants
+    "get_tenant": GetTenantTool,
+    "get_tenant_preference": GetTenantPreferenceTool,
     # coming soon:
     # "guardrail":          GuardrailTool,          no permission (always included)
     # "trigger_workflow":   TriggerWorkflowTool,    permission_category="workflows", operation="trigger"
     # "list_workflows":     ListWorkflowsTool,      permission_category="workflows", operation="read"
     # "upsert_subscriber":  UpsertSubscriberTool,   permission_category="subscribers", operation="manage"
     # "track_event":        TrackEventTool,         permission_category="events", operation="manage"
-    # "list_tenants":       ListTenantsTool,        permission_category="tenants", operation="read"
 }
 
 
