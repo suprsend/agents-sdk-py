@@ -1,5 +1,5 @@
 import asyncio
-import json
+import yaml
 
 from pydantic import BaseModel, Field
 
@@ -58,7 +58,7 @@ class GetObjectTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.objects.get, object_type, object_id)
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching object '{object_type}/{object_id}': {e}"
 
@@ -139,7 +139,7 @@ class GetObjectPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.objects.get_full_preference, object_type, object_id, options or None
                 )
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching preferences for object '{object_type}/{object_id}': {e}"
 
@@ -213,6 +213,6 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.objects.get_subscriptions, object_type, object_id, options
             )
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching subscriptions for object '{object_type}/{object_id}': {e}"

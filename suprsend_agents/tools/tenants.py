@@ -1,5 +1,5 @@
 import asyncio
-import json
+import yaml
 
 from pydantic import BaseModel, Field
 
@@ -52,7 +52,7 @@ class GetTenantTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.tenants.get, tenant_id)
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching tenant '{tenant_id}': {e}"
 
@@ -120,6 +120,6 @@ class GetTenantPreferenceTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.tenants.get_all_categories_preference, tenant_id, limit, offset, tags
             )
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching preferences for tenant '{tenant_id}': {e}"

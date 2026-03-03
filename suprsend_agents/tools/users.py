@@ -1,5 +1,6 @@
 import asyncio
-import json
+
+import yaml
 
 from pydantic import BaseModel, Field
 
@@ -52,7 +53,7 @@ class GetUserTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.users.get, distinct_id)
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching user '{distinct_id}': {e}"
 
@@ -127,6 +128,6 @@ class GetUserPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.users.get_full_preference, distinct_id, options or None
                 )
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching preferences for user '{distinct_id}': {e}"
