@@ -167,6 +167,83 @@ agent = create_react_agent(
 )
 ```
 
+## Injecting Context at Tool Call Time
+
+Tools expose all their parameters (workspace, tenant_id, etc.) as optional fields so the LLM can supply them when known. For server-side use you typically have this context already — from a session, a database record, or request metadata — and want to inject it automatically rather than relying on the LLM.
+
+A common example is **workspace injection**: the workspace slug is known at request time and should flow into every tool call without the LLM having to supply it.
+
+### LangGraph
+
+LangGraph injects a `RunnableConfig` into every tool call. Wrap the tool to read context from `run_config.configurable` (where LangGraph surfaces thread metadata and auth state):
+
+```python
+from langchain_core.tools import StructuredTool
+from langchain_core.runnables import RunnableConfig
+
+def inject_workspace(lc_tool) -> StructuredTool:
+    original = lc_tool.coroutine
+
+    async def _run(run_config: RunnableConfig, **kwargs) -> str:
+        if not kwargs.get("workspace"):
+            configurable = (run_config or {}).get("configurable") or {}
+            ws = configurable.get("workspace_slug", "")
+            if ws:
+                kwargs["workspace"] = ws
+        return await original(run_config=run_config, **kwargs)
+
+    return StructuredTool.from_function(
+        coroutine=_run,
+        name=lc_tool.name,
+        description=lc_tool.description,
+        args_schema=lc_tool.args_schema,
+    )
+
+tools = [inject_workspace(t) for t in toolkit.get_langchain_tools([...])]
+```
+
+### OpenAI / Anthropic function calling
+
+There is no `RunnableConfig` here. Use a **closure** to capture the workspace at the point where you handle the tool call:
+
+```python
+tool_defs = toolkit.get_openai_tools()
+
+async def handle_tool_call(name: str, args: dict, workspace: str) -> str:
+    # Inject workspace before dispatching — args come from the model's JSON output
+    args.setdefault("workspace", workspace)
+    return await toolkit.call(name, args)
+```
+
+Or bind it at construction time via `ToolContext` if the workspace is the same for every request from a given tenant:
+
+```python
+toolkit = SuprSendToolkit(
+    service_token="sst_...",
+    context=ToolContext(workspace="acme"),   # applied to every tool call
+)
+```
+
+### Python ContextVar (any framework)
+
+For frameworks that do not pass a request object into tool execution, a `ContextVar` lets you set context once per request and read it anywhere in the same async task:
+
+```python
+from contextvars import ContextVar
+
+_workspace_ctx: ContextVar[str] = ContextVar("workspace", default="")
+
+# In your request handler, before invoking the agent:
+_workspace_ctx.set(current_user.workspace_slug)
+
+# In a thin wrapper around the tool:
+async def _run(**kwargs) -> str:
+    kwargs.setdefault("workspace", _workspace_ctx.get())
+    return await original_tool(**kwargs)
+```
+
+The same pattern applies to any per-request value — tenant ID, locale, or feature flags.
+
 ## Adding Custom Tools
 
 Subclass `SuprSendTool` and register it with your toolkit:
