@@ -1,14 +1,14 @@
 from collections.abc import Callable
 from typing import Any
-from suprsend_agents.auth import ServiceTokenAuth, JWTAuth
-from suprsend_agents.client import AsyncSuprSendClient
-from suprsend_agents.context import ToolContext
-from suprsend_agents.types import Permissions
-from suprsend_agents.tools.resolve_workspace import ResolveWorkspaceTool
-from suprsend_agents.tools.search_docs import SearchDocsTool
-from suprsend_agents.tools.users import GetUserTool, GetUserPreferenceTool
-from suprsend_agents.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
-from suprsend_agents.tools.tenants import GetTenantTool, GetTenantPreferenceTool
+from suprsend_agents_toolkit.auth import ServiceTokenAuth, JWTAuth
+from suprsend_agents_toolkit.client import AsyncSuprSendClient
+from suprsend_agents_toolkit.context import ToolContext
+from suprsend_agents_toolkit.types import Permissions
+from suprsend_agents_toolkit.tools.resolve_workspace import ResolveWorkspaceTool
+from suprsend_agents_toolkit.tools.search_docs import SearchDocsTool
+from suprsend_agents_toolkit.tools.users import GetUserTool, GetUserPreferenceTool
+from suprsend_agents_toolkit.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
+from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 

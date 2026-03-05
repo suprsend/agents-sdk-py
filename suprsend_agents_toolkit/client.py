@@ -7,12 +7,12 @@ from typing import Any, TYPE_CHECKING
 
 import aiohttp
 
-from suprsend_agents.auth import SuprSendAuth, JWTAuth
+from suprsend_agents_toolkit.auth import SuprSendAuth, JWTAuth
 
 _WORKSPACE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 if TYPE_CHECKING:
-    from suprsend_agents.context import ToolContext
+    from suprsend_agents_toolkit.context import ToolContext
 
 
 class AsyncSuprSendClient:
