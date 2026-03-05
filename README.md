@@ -108,7 +108,7 @@ Tools without a `permission_category` (e.g. `search_suprsend_docs`) are always i
 ## LangGraph Example
 
 ```python
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
 from suprsend_agents_toolkit import SuprSendToolkit, ToolContext
 
@@ -117,7 +117,7 @@ toolkit = SuprSendToolkit(
     context=ToolContext(workspace="your-workspace"),
 )
 
-agent = create_react_agent(
+agent = create_agent(
     model=ChatAnthropic(model="claude-sonnet-4-6"),
     tools=toolkit.get_langchain_tools(),
 )
