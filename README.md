@@ -65,16 +65,28 @@ context = ToolContext(
 
 ## Available Tools
 
+**Hub tools** (hit `hub.suprsend.com` via HMAC-signed SDK):
+
 | Tool | Description | Permission |
 |------|-------------|------------|
 | `search_suprsend_docs` | Search SuprSend documentation | — |
 | `get_user` | Get user profile and channel identities | `subscribers.read` |
 | `get_user_preference` | Get notification preferences for a user | `subscribers.read` |
+| `get_user_object_subscriptions` | List objects a user is subscribed to | `subscribers.read` |
+| `get_user_list_subscriptions` | List broadcast lists a user belongs to | `subscribers.read` |
 | `get_object` | Get object profile and channel identities | `subscribers.read` |
 | `get_object_preference` | Get notification preferences for an object | `subscribers.read` |
 | `get_object_subscriptions` | List subscribers for an object | `subscribers.read` |
 | `get_tenant` | Get tenant profile, branding, and settings | `tenants.read` |
 | `get_tenant_preference` | Get all notification category preferences for a tenant | `tenants.read` |
+
+**Management tools** (hit `management-api.suprsend.com`, require `api_secret` on `ToolContext`):
+
+| Tool | Description | Permission |
+|------|-------------|------------|
+| `get_preference_categories` | List all notification preference categories in the workspace | `management.preference_categories.read` |
+| `list_workflows` | List workflows with optional search, slug filter, and sort | `management.workflows.read` |
+| `get_workflow` | Fetch full details of a single workflow by slug | `management.workflows.read` |
 
 ### Selecting Tools
 
@@ -99,6 +111,7 @@ toolkit = SuprSendToolkit(
     permissions=Permissions(
         subscribers={"read": True},
         tenants={"read": True},
+        management={"workflows": {"read": True}, "preference_categories": {"read": True}},
     ),
 )
 ```
