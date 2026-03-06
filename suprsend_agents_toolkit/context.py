@@ -12,6 +12,8 @@ class ToolContext:
                     Tools can override per-call; this is just the fallback.
     dashboard_url — Embedded in tool responses as a clickable link.
                     Defaults to https://app.suprsend.com.
+    api_secret    — API secret for the workspace. Required when using JWT auth
+                    with management API tools (sent as x-suprsend-api-secret).
 
     Internal URLs (base_url, mgmnt_url) have sensible defaults and rarely
     need to be changed.
@@ -20,6 +22,7 @@ class ToolContext:
     workspace: str = ""
     tenant_id: str | None = None
     dashboard_url: str = "https://app.suprsend.com"
+    api_secret: str = ""  # Used by JWT auth for management API (x-suprsend-api-secret header)
 
     # Internal — override only if pointing at a self-hosted or staging instance
     base_url: str = "https://hub.suprsend.com"

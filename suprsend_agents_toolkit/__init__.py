@@ -14,6 +14,7 @@ from suprsend_agents_toolkit.tools.users import (
 )
 from suprsend_agents_toolkit.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
 from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool
+from suprsend_agents_toolkit.tools.management import GetPreferenceCategoriesTool, ListWorkflowsTool, GetWorkflowTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 
@@ -34,6 +35,10 @@ _ALL_TOOLS: dict[str, type] = {
     # tenants
     "get_tenant": GetTenantTool,
     "get_tenant_preference": GetTenantPreferenceTool,
+    # management
+    "get_preference_categories": GetPreferenceCategoriesTool,
+    "list_workflows": ListWorkflowsTool,
+    "get_workflow": GetWorkflowTool,
     # coming soon:
     # "guardrail":          GuardrailTool,          no permission (always included)
     # "trigger_workflow":   TriggerWorkflowTool,    permission_category="workflows", operation="trigger"
@@ -50,9 +55,12 @@ def _is_permitted(tool_cls: type, permissions: Permissions | None) -> bool:
     Rules:
     - No permission_category declared → always included (guardrail, search_docs, etc.)
     - No permissions config on toolkit → all tools included
-    - permission_category + operation both present → check the config
+    - Hub tools: permission_category + operation → check permissions[category][operation]
+    - Management tools: permission_category="management", permission_subcategory, operation
+      → check permissions["management"][subcategory][operation]
     """
     category = getattr(tool_cls, "permission_category", None)
+    subcategory = getattr(tool_cls, "permission_subcategory", None)
     operation = getattr(tool_cls, "permission_operation", None)
 
     if not category or not operation:
@@ -62,6 +70,8 @@ def _is_permitted(tool_cls: type, permissions: Permissions | None) -> bool:
         return True  # no restrictions configured — everything allowed
 
     cat_perms = permissions.get(category, {})
+    if subcategory:
+        cat_perms = cat_perms.get(subcategory, {})
     return bool(cat_perms.get(operation, False))
 
 

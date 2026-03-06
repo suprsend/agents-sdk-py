@@ -125,6 +125,16 @@ class AsyncSuprSendClient:
         key, secret = await self.exchange_workspace_credentials(workspace)
         return Suprsend(key, secret, base_url=self.base_url)
 
+    def get_management_instance(self):
+        """
+        Return a SuprsendManagement instance with no auth preset.
+
+        Auth headers are injected per-call by ManagementTool._mgmnt_headers()
+        so the same instance can serve different auth contexts if needed.
+        """
+        from suprsend_management import SuprsendManagement
+        return SuprsendManagement(base_url=self.mgmnt_url)
+
     # ── Management API (service token / JWT) ──────────────────────────────────
 
     async def mgmnt_get(self, path: str, params: dict | None = None) -> Any:
