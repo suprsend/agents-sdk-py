@@ -1,20 +1,20 @@
 import asyncio
-import json
+import yaml
 
 from pydantic import BaseModel, Field
 
-from suprsend_agents.client import AsyncSuprSendClient
-from suprsend_agents.core.base import SuprSendTool
+from suprsend_agents_toolkit.client import AsyncSuprSendClient
+from suprsend_agents_toolkit.core.base import SuprSendTool
 
 
 # ── GetObjectTool ─────────────────────────────────────────────────────────────
 
 class GetObjectInput(BaseModel):
     object_type: str = Field(
-        description="The type/category of the object (e.g. 'company', 'team')."
+        description="Type of the object. Used to group similar objects together. Should be a plural namespace (e.g. 'departments', 'teams')."
     )
     object_id: str = Field(
-        description="The unique identifier of the object."
+        description="Unique identifier of the object within the given object_type."
     )
     workspace: str = Field(
         default="",
@@ -23,22 +23,22 @@ class GetObjectInput(BaseModel):
 
 
 class GetObjectTool(SuprSendTool):
-    """
-    GET {base_url}/v1/object/{object_type}/{object_id}/
-
-    Returns the full object profile: properties, channel identities,
-    created_at, updated_at.
-    """
+    """GET {base_url}/v1/object/{object_type}/{object_id}/"""
 
     name = "get_object"
     description = (
-        "Get all properties and channel identities for an object in SuprSend. "
-        "Objects represent non-user entities such as companies, teams, or devices. "
-        "Returns properties, channel addresses, and account timestamps."
+        "Fetches the full profile of an object by its type and ID — including all channel "
+        "configurations, custom properties, and the count of users or child objects subscribed "
+        "to it. Objects are entities in your system (like teams, departments, or organizations) "
+        "that can have notification channels and subscribers just like users."
     )
     args_schema = GetObjectInput
     permission_category = "subscribers"
     permission_operation = "read"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = True
 
     async def execute(
         self,
@@ -58,7 +58,7 @@ class GetObjectTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.objects.get, object_type, object_id)
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching object '{object_type}/{object_id}': {e}"
 
@@ -67,10 +67,10 @@ class GetObjectTool(SuprSendTool):
 
 class GetObjectPreferenceInput(BaseModel):
     object_type: str = Field(
-        description="The type/category of the object (e.g. 'company', 'team')."
+        description="Type of the object. Should be a plural namespace (e.g. 'departments', 'teams')."
     )
     object_id: str = Field(
-        description="The unique identifier of the object."
+        description="Unique identifier of the object within the given object_type."
     )
     category: str = Field(
         default="",
@@ -90,25 +90,24 @@ class GetObjectPreferenceInput(BaseModel):
 
 
 class GetObjectPreferenceTool(SuprSendTool):
-    """
-    Full preferences:
-        GET {base_url}/v1/object/{object_type}/{object_id}/preference/?tenant_id=...
-        Returns sections (categories + channels) and global channel preferences.
-
-    Single category:
-        GET {base_url}/v1/object/{object_type}/{object_id}/preference/category/{category}/?tenant_id=...
-        Returns preference, opt-out channels, editability for that category.
-    """
+    """GET {base_url}/v1/object/{object_type}/{object_id}/preference/"""
 
     name = "get_object_preference"
     description = (
-        "Get notification preferences for an object. "
-        "Omit category to get all preferences across every notification category. "
-        "Pass a category slug to get preferences for that specific category only."
+        "Fetches the complete notification preference profile for an object — both category-level "
+        "opt-in/out status across all categories, and overall channel-level restrictions. "
+        "Identical in structure to get_user_preference but scoped to objects (teams, departments, "
+        "organizations). Use this to inspect what notifications an object and its subscribers will "
+        "receive, or to debug why an object isn't getting notifications on a particular channel or "
+        "category. Pass a category slug to fetch preferences for that specific category only."
     )
     args_schema = GetObjectPreferenceInput
     permission_category = "subscribers"
     permission_operation = "read"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = True
 
     async def execute(
         self,
@@ -139,7 +138,7 @@ class GetObjectPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.objects.get_full_preference, object_type, object_id, options or None
                 )
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching preferences for object '{object_type}/{object_id}': {e}"
 
@@ -148,10 +147,10 @@ class GetObjectPreferenceTool(SuprSendTool):
 
 class GetObjectSubscriptionsInput(BaseModel):
     object_type: str = Field(
-        description="The type/category of the object (e.g. 'company', 'team')."
+        description="Type of the parent object. Should be a plural namespace (e.g. 'departments', 'teams')."
     )
     object_id: str = Field(
-        description="The unique identifier of the object."
+        description="Unique identifier of the parent object."
     )
     limit: int = Field(
         default=20,
@@ -168,23 +167,22 @@ class GetObjectSubscriptionsInput(BaseModel):
 
 
 class GetObjectSubscriptionsTool(SuprSendTool):
-    """
-    GET {base_url}/v1/object/{object_type}/{object_id}/subscription/
-
-    Returns a paginated list of subscribers (users or other objects) that are
-    subscribed to receive notifications scoped to this object.
-    Supports cursor-based pagination via `cursor` and `limit`.
-    """
+    """GET {base_url}/v1/object/{object_type}/{object_id}/subscription/"""
 
     name = "get_object_subscriptions"
     description = (
-        "Get the list of subscribers for an object in SuprSend. "
-        "Returns users or other objects subscribed to receive notifications "
-        "related to this object. Supports cursor-based pagination."
+        "Returns a paginated list of all subscribers (users or child objects) attached to a given "
+        "object. Each result shows either a user or an object subscriber, plus any subscription-level "
+        "properties set when they were added. Subscription properties are accessible in workflow "
+        "templates as $recipient.subscription.<key>."
     )
     args_schema = GetObjectSubscriptionsInput
     permission_category = "subscribers"
     permission_operation = "read"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = True
 
     async def execute(
         self,
@@ -213,6 +211,6 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.objects.get_subscriptions, object_type, object_id, options
             )
-            return json.dumps(result, indent=2)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching subscriptions for object '{object_type}/{object_id}': {e}"

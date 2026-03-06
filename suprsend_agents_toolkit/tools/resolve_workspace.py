@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
-from suprsend_agents.client import AsyncSuprSendClient
-from suprsend_agents.core.base import SuprSendTool
+from suprsend_agents_toolkit.client import AsyncSuprSendClient
+from suprsend_agents_toolkit.core.base import SuprSendTool
 
 
 class ResolveWorkspaceInput(BaseModel):

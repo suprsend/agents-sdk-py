@@ -1,13 +1,19 @@
 from collections.abc import Callable
 from typing import Any
-from suprsend_agents.auth import ServiceTokenAuth, JWTAuth
-from suprsend_agents.client import AsyncSuprSendClient
-from suprsend_agents.context import ToolContext
-from suprsend_agents.types import Permissions
-from suprsend_agents.tools.resolve_workspace import ResolveWorkspaceTool
-from suprsend_agents.tools.search_docs import SearchDocsTool
-from suprsend_agents.tools.users import GetUserTool, GetUserPreferenceTool
-from suprsend_agents.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
+from suprsend_agents_toolkit.auth import ServiceTokenAuth, JWTAuth
+from suprsend_agents_toolkit.client import AsyncSuprSendClient
+from suprsend_agents_toolkit.context import ToolContext
+from suprsend_agents_toolkit.types import Permissions
+from suprsend_agents_toolkit.tools.resolve_workspace import ResolveWorkspaceTool
+from suprsend_agents_toolkit.tools.search_docs import SearchDocsTool
+from suprsend_agents_toolkit.tools.users import (
+    GetUserTool,
+    GetUserPreferenceTool,
+    GetUserObjectSubscriptionsTool,
+    GetUserListSubscriptionsTool,
+)
+from suprsend_agents_toolkit.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
+from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 
@@ -19,17 +25,21 @@ _ALL_TOOLS: dict[str, type] = {
     # users
     "get_user": GetUserTool,
     "get_user_preference": GetUserPreferenceTool,
+    "get_user_object_subscriptions": GetUserObjectSubscriptionsTool,
+    "get_user_list_subscriptions": GetUserListSubscriptionsTool,
     # objects
     "get_object": GetObjectTool,
     "get_object_preference": GetObjectPreferenceTool,
     "get_object_subscriptions": GetObjectSubscriptionsTool,
+    # tenants
+    "get_tenant": GetTenantTool,
+    "get_tenant_preference": GetTenantPreferenceTool,
     # coming soon:
     # "guardrail":          GuardrailTool,          no permission (always included)
     # "trigger_workflow":   TriggerWorkflowTool,    permission_category="workflows", operation="trigger"
     # "list_workflows":     ListWorkflowsTool,      permission_category="workflows", operation="read"
     # "upsert_subscriber":  UpsertSubscriberTool,   permission_category="subscribers", operation="manage"
     # "track_event":        TrackEventTool,         permission_category="events", operation="manage"
-    # "list_tenants":       ListTenantsTool,        permission_category="tenants", operation="read"
 }
 
 

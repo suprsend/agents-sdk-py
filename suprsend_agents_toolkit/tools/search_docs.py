@@ -4,8 +4,8 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from pydantic import BaseModel, Field
 
-from suprsend_agents.client import AsyncSuprSendClient
-from suprsend_agents.core.base import SuprSendTool
+from suprsend_agents_toolkit.client import AsyncSuprSendClient
+from suprsend_agents_toolkit.core.base import SuprSendTool
 
 MINTLIFY_MCP_URL = "https://docs.suprsend.com/mcp"
 MCP_TOOL_NAME = "SearchSuprSendNotification"
