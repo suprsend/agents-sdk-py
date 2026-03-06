@@ -6,7 +6,12 @@ from suprsend_agents_toolkit.context import ToolContext
 from suprsend_agents_toolkit.types import Permissions
 from suprsend_agents_toolkit.tools.resolve_workspace import ResolveWorkspaceTool
 from suprsend_agents_toolkit.tools.search_docs import SearchDocsTool
-from suprsend_agents_toolkit.tools.users import GetUserTool, GetUserPreferenceTool
+from suprsend_agents_toolkit.tools.users import (
+    GetUserTool,
+    GetUserPreferenceTool,
+    GetUserObjectSubscriptionsTool,
+    GetUserListSubscriptionsTool,
+)
 from suprsend_agents_toolkit.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
 from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool
 
@@ -20,6 +25,8 @@ _ALL_TOOLS: dict[str, type] = {
     # users
     "get_user": GetUserTool,
     "get_user_preference": GetUserPreferenceTool,
+    "get_user_object_subscriptions": GetUserObjectSubscriptionsTool,
+    "get_user_list_subscriptions": GetUserListSubscriptionsTool,
     # objects
     "get_object": GetObjectTool,
     "get_object_preference": GetObjectPreferenceTool,

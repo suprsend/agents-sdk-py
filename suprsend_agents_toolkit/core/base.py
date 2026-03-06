@@ -55,6 +55,12 @@ class SuprSendTool(ABC):
     permission_category: str | None = None   # "workflows" | "subscribers" | ...
     permission_operation: str | None = None  # "read" | "manage" | "trigger"
 
+    # Annotations — describe the tool's behaviour characteristics
+    read_only: bool = True    # does not mutate any state
+    destructive: bool = False # can permanently delete or overwrite data
+    idempotent: bool = True   # repeated identical calls produce the same result
+    open_world: bool = True   # may return data that changes between calls
+
     def __init__(self, client: Any) -> None:
         self._client = client  # AsyncSuprSendClient
 
