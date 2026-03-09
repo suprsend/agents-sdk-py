@@ -14,7 +14,7 @@ from suprsend_agents_toolkit.tools.users import (
 )
 from suprsend_agents_toolkit.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
 from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool
-from suprsend_agents_toolkit.tools.management import GetPreferenceCategoriesTool, ListWorkflowsTool, GetWorkflowTool
+from suprsend_agents_toolkit.tools.management import GetPreferenceCategoriesTool, ListWorkflowsTool, GetWorkflowTool, GetEventDetailsTool, GetTranslationDetailsTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 
@@ -39,6 +39,8 @@ _ALL_TOOLS: dict[str, type] = {
     "get_preference_categories": GetPreferenceCategoriesTool,
     "list_workflows": ListWorkflowsTool,
     "get_workflow": GetWorkflowTool,
+    "get_event_details": GetEventDetailsTool,
+    "get_translation_details": GetTranslationDetailsTool,
     # coming soon:
     # "guardrail":          GuardrailTool,          no permission (always included)
     # "trigger_workflow":   TriggerWorkflowTool,    permission_category="workflows", operation="trigger"
