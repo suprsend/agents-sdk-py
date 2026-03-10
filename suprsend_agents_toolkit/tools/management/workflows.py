@@ -33,6 +33,14 @@ class ListWorkflowsInput(BaseModel):
             "'updated_at', '-updated_at'. Prefix '-' means descending."
         ),
     )
+    limit: int = Field(
+        default=10,
+        description="Maximum number of workflows to return (max 50).",
+    )
+    offset: int = Field(
+        default=0,
+        description="Number of workflows to skip for pagination.",
+    )
 
 
 class ListWorkflowsTool(ManagementTool):
@@ -59,6 +67,8 @@ class ListWorkflowsTool(ManagementTool):
         slugs: list = None,
         include_archived: bool = False,
         order_by: str = "",
+        limit: int = 10,
+        offset: int = 0,
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -73,6 +83,8 @@ class ListWorkflowsTool(ManagementTool):
                     slugs=kw.pop("slugs") or None,
                     include_archived=kw.pop("include_archived"),
                     order_by=kw.pop("order_by") or None,
+                    limit=kw.pop("limit"),
+                    offset=kw.pop("offset"),
                     **kw,
                 ),
                 workspace=ws,
@@ -80,6 +92,8 @@ class ListWorkflowsTool(ManagementTool):
                 slugs=slugs or [],
                 include_archived=include_archived,
                 order_by=order_by,
+                limit=limit,
+                offset=offset,
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
