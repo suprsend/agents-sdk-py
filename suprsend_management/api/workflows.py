@@ -39,6 +39,8 @@ class WorkflowsApi:
         slugs: list[str] | None = None,
         include_archived: bool = False,
         order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
         extra_headers: dict | None = None,
     ) -> dict:
         """
@@ -51,6 +53,8 @@ class WorkflowsApi:
             include_archived: When True, include archived workflows (default False).
             order_by:         Sort order — one of "last_executed_at", "-last_executed_at",
                               "updated_at", "-updated_at".
+            limit:            Maximum number of results to return (max 50).
+            offset:           Number of results to skip for pagination.
             extra_headers:    Additional headers merged into the request.
 
         Returns:
@@ -68,6 +72,10 @@ class WorkflowsApi:
             params["include_archived"] = "true"
         if order_by:
             params["order_by"] = order_by
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
 
         resp = requests.get(
             self._url(workspace),
