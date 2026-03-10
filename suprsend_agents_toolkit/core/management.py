@@ -15,7 +15,7 @@ class ManagementTool(SuprSendTool):
     - No workspace credential exchange — management API uses direct auth.
     - ServiceTokenAuth  → Authorization: ServiceToken <token>
     - JWTAuth           → Authorization: Bearer <jwt>
-                          x-suprsend-api-secret: <secret>  (from context.api_secret)
+                          x-ss-api-secret: <secret>  (from context.api_secret)
     - Calls are dispatched through SuprsendManagement SDK (synchronous, requests-based)
       via asyncio.to_thread, same pattern as hub tools using suprsend-py-sdk.
 
@@ -47,11 +47,11 @@ class ManagementTool(SuprSendTool):
 
         ServiceTokenAuth:  Authorization: ServiceToken <token>
         JWTAuth:           Authorization: Bearer <jwt>
-                           x-suprsend-api-secret: <secret>  (if context.api_secret set)
+                           x-ss-api-secret: <secret>  (if context.api_secret set)
         """
         headers = client.auth.get_headers()
         if isinstance(client.auth, JWTAuth) and client.context.api_secret:
-            headers["x-suprsend-api-secret"] = client.context.api_secret
+            headers["x-ss-api-secret"] = client.context.api_secret
         return headers
 
     async def _mgmnt_run(
