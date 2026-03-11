@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import re
 from collections.abc import Callable
@@ -89,6 +90,28 @@ class AsyncSuprSendClient:
 
     # ── Exchange ──────────────────────────────────────────────────────────────
 
+    def _make_cache_key(self, workspace: str) -> str:
+        """
+        Build a cache key scoped to both the calling user and workspace slug.
+
+        For JWT auth the token payload contains `user_id` which is unique per
+        user/org, so two organisations that happen to share the same workspace
+        slug will never collide in the cache.  For ServiceToken auth the token
+        is already org-scoped, so the workspace slug alone is sufficient.
+        """
+        if isinstance(self.auth, JWTAuth):
+            try:
+                payload_b64 = self.auth.token.split(".")[1]
+                payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+            except Exception as e:
+                raise ValueError(f"Failed to decode JWT payload: {e}") from e
+            user_id = claims.get("user_id")
+            if not user_id:
+                raise ValueError("JWT payload missing user_id — cannot safely scope workspace cache")
+            return f"{user_id}:{workspace}"
+        return workspace
+
     async def exchange_workspace_credentials(
         self, workspace: str
     ) -> tuple[str, str]:
@@ -102,14 +125,15 @@ class AsyncSuprSendClient:
         if not workspace or not _WORKSPACE_RE.match(workspace):
             raise ValueError(f"Invalid workspace slug: {workspace!r}")
 
-        if workspace in self._workspace_cache:
-            return self._workspace_cache[workspace]
+        cache_key = self._make_cache_key(workspace)
+        if cache_key in self._workspace_cache:
+            return self._workspace_cache[cache_key]
 
         url = f"{self.base_url}/v1/{workspace}/ws_key/bridge"
         result = await self.get(url)
         key = result["key"]
         secret = result["secret"]
-        self._workspace_cache[workspace] = (key, secret)
+        self._workspace_cache[cache_key] = (key, secret)
         return key, secret
 
     async def get_sdk_instance(self, workspace: str):
@@ -124,6 +148,16 @@ class AsyncSuprSendClient:
         from suprsend import Suprsend
         key, secret = await self.exchange_workspace_credentials(workspace)
         return Suprsend(key, secret, base_url=self.base_url)
+
+    def get_management_instance(self):
+        """
+        Return a SuprsendManagement instance with no auth preset.
+
+        Auth headers are injected per-call by ManagementTool._mgmnt_headers()
+        so the same instance can serve different auth contexts if needed.
+        """
+        from suprsend_management import SuprsendManagement
+        return SuprsendManagement(base_url=self.mgmnt_url)
 
     # ── Management API (service token / JWT) ──────────────────────────────────
 

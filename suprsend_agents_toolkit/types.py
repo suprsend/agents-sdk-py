@@ -25,6 +25,23 @@ class WorkflowPermissions(TypedDict, total=False):
     trigger: bool
 
 
+class ManagementPermissions(TypedDict, total=False):
+    """
+    Permission gates for management API tools (management-api.suprsend.com).
+
+    Each key is a management resource; the value is a ResourcePermissions dict
+    controlling read and manage access independently.
+
+    Example:
+        ManagementPermissions(
+            workflows={"read": True},
+            preference_categories={"read": True},
+        )
+    """
+    workflows: ResourcePermissions
+    preference_categories: ResourcePermissions
+
+
 class Permissions(TypedDict, total=False):
     """
     Passed to SuprSendToolkit at creation time.
@@ -43,12 +60,14 @@ class Permissions(TypedDict, total=False):
             subscribers={"read": True, "manage": True},
             events={"manage": True},
             tenants={"read": True},
+            management=ManagementPermissions(workspaces={"read": True}),
         )
     """
     workflows: WorkflowPermissions
     subscribers: ResourcePermissions
     events: ResourcePermissions
     tenants: ResourcePermissions
+    management: ManagementPermissions
 
 
 # ── Workspace credentials ─────────────────────────────────────────────────────

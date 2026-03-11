@@ -68,10 +68,12 @@ class SuprSendTool(ABC):
 
     def _workspace(self, client: Any, kwargs: dict) -> str:
         """
-        Resolve workspace: explicit kwarg first, then context default.
-        Returns empty string if neither is set (tool should handle / error).
+        Resolve workspace: context default first, then explicit kwarg.
+        If context.workspace is set it always wins — tools are scoped to that
+        workspace regardless of what the LLM or thread metadata supplies.
+        Falls back to the kwarg when context is not configured.
         """
-        return kwargs.get("workspace") or client.context.workspace
+        return client.context.workspace or kwargs.get("workspace")
 
     def _tenant_id(self, client: Any, kwargs: dict) -> str:
         """
