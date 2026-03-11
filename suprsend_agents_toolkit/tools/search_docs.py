@@ -8,7 +8,7 @@ from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
 MINTLIFY_MCP_URL = "https://docs.suprsend.com/mcp"
-MCP_TOOL_NAME = "SearchSuprSendNotification"
+MCP_TOOL_NAME = "search_supr_send_notification"
 
 
 def _run_mcp_search(query: str) -> str:
