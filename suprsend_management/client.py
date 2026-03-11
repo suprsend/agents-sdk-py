@@ -38,6 +38,10 @@ class SuprsendManagement:
 
         from suprsend_management.api.preference_categories import PreferenceCategoriesApi
         from suprsend_management.api.workflows import WorkflowsApi
+        from suprsend_management.api.events import EventsApi
+        from suprsend_management.api.translations import TranslationsApi
 
         self.preference_categories = PreferenceCategoriesApi(self)
         self.workflows = WorkflowsApi(self)
+        self.events = EventsApi(self)
+        self.translations = TranslationsApi(self)

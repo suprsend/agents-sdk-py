@@ -1,36 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import requests
 
+from suprsend_management.api.base import BaseApi
 from suprsend_management.exception import SuprsendManagementException
 
-if TYPE_CHECKING:
-    from suprsend_management.client import SuprsendManagement
 
-
-class WorkflowsApi:
+class WorkflowsApi(BaseApi):
     """
     Management API callers for v1/{ws}/workflow/ endpoints.
     """
-
-    def __init__(self, config: "SuprsendManagement") -> None:
-        self.config = config
 
     def _url(self, workspace: str, workflow_slug: str | None = None) -> str:
         base = f"{self.config.base_url}/v1/{workspace}/workflow/"
         if workflow_slug:
             return f"{base}{workflow_slug}/"
         return base
-
-    def _headers(self, extra: dict | None = None) -> dict:
-        h: dict = {"Content-Type": "application/json"}
-        if self.config.auth:
-            h.update(self.config.auth.get_headers())
-        if extra:
-            h.update(extra)
-        return h
 
     def list(
         self,

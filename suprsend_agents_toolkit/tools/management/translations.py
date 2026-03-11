@@ -45,7 +45,12 @@ class GetTranslationDetailsTool(ManagementTool):
         if not filename:
             return "Error: filename is required."
         try:
-            result = await client.mgmnt_get(f"/v1/{ws}/translation/content/{filename}/")
+            result = await self._mgmnt_run(
+                client,
+                lambda mgmt, **kw: mgmt.translations.get(kw.pop("workspace"), kw.pop("filename"), **kw),
+                workspace=ws,
+                filename=filename,
+            )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching translation '{filename}' in workspace '{ws}': {e}"

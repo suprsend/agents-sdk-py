@@ -66,6 +66,18 @@ class AsyncSuprSendClient:
         new._session = self._session  # share the connection pool
         return new
 
+    async def close(self) -> None:
+        """Close the underlying aiohttp session. Call when the client is no longer needed."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+    async def __aenter__(self) -> "AsyncSuprSendClient":
+        return self
+
+    async def __aexit__(self, *_) -> None:
+        await self.close()
+
     # ── Low-level helpers ─────────────────────────────────────────────────────
 
     def _get_session(self) -> aiohttp.ClientSession:

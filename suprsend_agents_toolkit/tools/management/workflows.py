@@ -1,5 +1,4 @@
 import yaml
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +17,7 @@ class ListWorkflowsInput(BaseModel):
         default="",
         description="Search workflows by name, slug, or description.",
     )
-    slugs: List[str] = Field(
+    slugs: list[str] = Field(
         default_factory=list,
         description="Filter to specific workflow slugs. Multiple slugs are OR-combined.",
     )

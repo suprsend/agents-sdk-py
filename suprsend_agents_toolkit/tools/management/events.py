@@ -45,7 +45,12 @@ class GetEventDetailsTool(ManagementTool):
         if not event_name:
             return "Error: event_name is required."
         try:
-            result = await client.mgmnt_get(f"/v1/{ws}/event/{event_name}/")
+            result = await self._mgmnt_run(
+                client,
+                lambda mgmt, **kw: mgmt.events.get(kw.pop("workspace"), kw.pop("event_name"), **kw),
+                workspace=ws,
+                event_name=event_name,
+            )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching event '{event_name}' in workspace '{ws}': {e}"
