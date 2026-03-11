@@ -22,6 +22,10 @@ def _run_mcp_search(query: str) -> str:
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(MCP_TOOL_NAME, {"query": query})
+                if result.isError:
+                    text_parts = [c.text for c in result.content if hasattr(c, "text")]
+                    error_msg = "\n".join(text_parts) if text_parts else "Unknown error"
+                    return f"Error searching docs: {error_msg}"
                 if result.content:
                     text_parts = [c.text for c in result.content if hasattr(c, "text")]
                     return "\n".join(text_parts) if text_parts else "No results found."
