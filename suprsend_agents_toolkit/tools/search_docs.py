@@ -25,7 +25,7 @@ def _run_mcp_search(query: str) -> str:
                 if result.isError:
                     text_parts = [c.text for c in result.content if hasattr(c, "text")]
                     error_msg = "\n".join(text_parts) if text_parts else "Unknown error"
-                    return f"Error searching docs: {error_msg}"
+                    raise RuntimeError(error_msg)
                 if result.content:
                     text_parts = [c.text for c in result.content if hasattr(c, "text")]
                     return "\n".join(text_parts) if text_parts else "No results found."
@@ -65,9 +65,6 @@ class SearchDocsTool(SuprSendTool):
         **_: object,
     ) -> str:
         if not query:
-            return "Invalid query provided."
+            raise ValueError("Invalid query provided.")
 
-        try:
-            return await asyncio.to_thread(_run_mcp_search, query)
-        except Exception as e:
-            return f"Error searching docs: {e}"
+        return await asyncio.to_thread(_run_mcp_search, query)

@@ -137,6 +137,7 @@ class SuprSendTool(ABC):
             name=self.name,
             description=self.description,
             args_schema=self.args_schema,
+            handle_tool_error=True,
         )
 
     def to_openai(self) -> dict:
