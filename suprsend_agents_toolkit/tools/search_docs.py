@@ -11,6 +11,16 @@ MINTLIFY_MCP_URL = "https://docs.suprsend.com/mcp"
 MCP_TOOL_NAME = "search_supr_send_notification"
 
 
+def _leaf_exceptions(exc: BaseException) -> list[BaseException]:
+    """Recursively unwrap ExceptionGroups to get the actual root-cause exceptions."""
+    if isinstance(exc, BaseExceptionGroup):
+        leaves: list[BaseException] = []
+        for sub in exc.exceptions:
+            leaves.extend(_leaf_exceptions(sub))
+        return leaves
+    return [exc]
+
+
 def _run_mcp_search(query: str) -> str:
     """
     Runs the MCP search in its own event loop.
@@ -34,6 +44,10 @@ def _run_mcp_search(query: str) -> str:
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(_call())
+    except BaseExceptionGroup as eg:
+        leaves = _leaf_exceptions(eg)
+        msg = "; ".join(str(e) for e in leaves)
+        raise RuntimeError(msg) from None
     finally:
         loop.close()
 
