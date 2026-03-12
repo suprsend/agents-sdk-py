@@ -124,23 +124,19 @@ class SuprSendTool(ABC):
         run_config: RunnableConfig is injected by LangGraph at every call,
         enabling the JWT swap without changes in execute().
         """
-        from langchain_core.tools import StructuredTool, ToolException
+        from langchain_core.tools import StructuredTool
 
         tool_self = self
 
         async def _run(run_config: RunnableConfig, **kwargs: Any) -> str:
             client = tool_self._resolve_client(run_config)
-            try:
-                return await tool_self.execute(client=client, **kwargs)
-            except Exception as e:
-                raise ToolException(str(e)) from e
+            return await tool_self.execute(client=client, **kwargs)
 
         return StructuredTool.from_function(
             coroutine=_run,
             name=self.name,
             description=self.description,
             args_schema=self.args_schema,
-            handle_tool_error=True,
         )
 
     def to_openai(self) -> dict:
