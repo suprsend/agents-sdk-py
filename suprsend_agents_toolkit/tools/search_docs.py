@@ -63,7 +63,4 @@ class SearchDocsTool(SuprSendTool):
         if not query:
             return "Invalid query provided."
 
-        try:
-            return await asyncio.to_thread(_run_mcp_search, query)
-        except Exception as e:
-            return f"Error searching docs: {e}"
+        return await asyncio.to_thread(_run_mcp_search, query)
