@@ -44,7 +44,6 @@ _ALL_TOOLS: dict[str, type] = {
     # coming soon:
     # "guardrail":          GuardrailTool,          no permission (always included)
     # "trigger_workflow":   TriggerWorkflowTool,    permission_category="workflows", operation="trigger"
-    # "list_workflows":     ListWorkflowsTool,      permission_category="workflows", operation="read"
     # "upsert_subscriber":  UpsertSubscriberTool,   permission_category="subscribers", operation="manage"
     # "track_event":        TrackEventTool,         permission_category="events", operation="manage"
 }
@@ -137,6 +136,12 @@ class SuprSendToolkit:
     def _permitted_names(self, requested: list[str] | None) -> list[str]:
         """Names from the requested list (or all) that pass the permission check."""
         names = requested or list(_ALL_TOOLS.keys())
+        unknown = [n for n in names if n not in _ALL_TOOLS]
+        if unknown:
+            raise ValueError(
+                f"Unknown tool name(s): {unknown}. "
+                f"Valid names: {sorted(_ALL_TOOLS.keys())}"
+            )
         return [
             n for n in names
             if _is_permitted(_ALL_TOOLS[n], self._permissions)
@@ -162,3 +167,38 @@ class SuprSendToolkit:
             self._instantiate(n) for n in self._permitted_names(tools)
         ]
         return [t.to_openai() for t in instances]
+
+    async def run_tool(self, name: str, args: dict, run_config: Any = None) -> str:
+        """
+        Execute a tool by name with the given args.
+
+        Intended for use alongside get_openai_tools() — call this from your
+        tool dispatch loop when the model returns a tool_call:
+
+            tool_defs = toolkit.get_openai_tools()
+            # ... send to OpenAI, receive tool_call ...
+            result = await toolkit.run_tool(tool_call.function.name,
+                                            json.loads(tool_call.function.arguments))
+
+        Args:
+            name:       Tool name as returned in the function-calling response.
+            args:       Parsed arguments dict from the model's tool call.
+            run_config: Optional framework run config (e.g. LangGraph RunnableConfig)
+                        used to extract a per-request JWT when jwt_getter is set.
+                        Pass None when using service token auth.
+
+        Returns:
+            The tool's string output, ready to send back to the model.
+
+        Raises:
+            ValueError: if name is not a registered tool.
+        """
+        if name == ResolveWorkspaceTool.name:
+            instance = ResolveWorkspaceTool(client=self._client)
+        elif name in _ALL_TOOLS:
+            instance = self._instantiate(name)
+        else:
+            valid = ["resolve_workspace"] + sorted(_ALL_TOOLS.keys())
+            raise ValueError(f"Unknown tool: {name!r}. Valid names: {valid}")
+        client = instance._resolve_client(run_config)
+        return await instance.execute(client=client, **args)

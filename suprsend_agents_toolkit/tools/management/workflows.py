@@ -1,5 +1,4 @@
 import yaml
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +17,7 @@ class ListWorkflowsInput(BaseModel):
         default="",
         description="Search workflows by name, slug, or description.",
     )
-    slugs: List[str] = Field(
+    slugs: list[str] = Field(
         default_factory=list,
         description="Filter to specific workflow slugs. Multiple slugs are OR-combined.",
     )
@@ -48,9 +47,16 @@ class ListWorkflowsTool(ManagementTool):
 
     name = "list_workflows"
     description = (
-        "List workflows in the workspace. Supports full-text search by name or slug, "
-        "filtering to specific slugs, and sorting by last execution or update time. "
-        "Use this to discover which workflows exist before fetching details or triggering one."
+        "List notification workflows created via the SuprSend dashboard UI. "
+        "SuprSend supports three workflow types: (1) Event-triggered — the app publishes a named "
+        "event and SuprSend routes it to matching workflows, decoupling the app from notification "
+        "logic; (2) API-triggered — the app calls workflows.trigger() with a slug, recipients, "
+        "and data, giving direct control over which workflow fires; (3) Dynamic — the entire "
+        "workflow structure (steps, channels, templates) is defined inline in the API request at "
+        "runtime, requiring no pre-configured dashboard workflow. "
+        "Supports full-text search by name or slug, filtering to specific slugs, and sorting by "
+        "last execution or update time. Use this to discover which workflows exist before "
+        "fetching details or triggering one."
     )
     args_schema = ListWorkflowsInput
     permission_subcategory = "workflows"
