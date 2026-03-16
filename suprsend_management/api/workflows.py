@@ -98,3 +98,32 @@ class WorkflowsApi(BaseApi):
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
         return resp.json()
+
+    def push(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        workflow: dict,
+        commit: bool = True,
+        commit_message: str = "",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        Create or update a workflow definition.
+
+        POST {base_url}/v1/{workspace}/workflow/{slug}/?commit={commit}&commit_message={msg}
+        Body: full workflow definition dict.
+        Returns: {"validation_result": {"is_valid": bool, "errors": [...]}}
+        """
+        params = {"commit": "true" if commit else "false"}
+        if commit_message:
+            params["commit_message"] = commit_message
+        resp = requests.post(
+            self._url(workspace, workflow_slug),
+            headers=self._headers(extra_headers),
+            params=params,
+            json=workflow,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()

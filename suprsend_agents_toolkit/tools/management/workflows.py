@@ -159,3 +159,69 @@ class GetWorkflowTool(ManagementTool):
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return f"Error fetching workflow '{workflow_slug}': {e}"
+
+
+# ── PushWorkflowTool ──────────────────────────────────────────────────────────
+
+class PushWorkflowInput(BaseModel):
+    workflow_slug: str = Field(description="Slug of the workflow to push.")
+    workflow: dict = Field(description="Full workflow definition as a JSON object.")
+    commit: bool = Field(default=True, description="If True, validate and commit the workflow. If False, save as draft.")
+    commit_message: str = Field(default="", description="Commit message describing the changes.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class PushWorkflowTool(ManagementTool):
+    """POST {mgmnt_url}/v1/{ws}/workflow/{slug}/"""
+
+    name = "push_workflow"
+    description = (
+        "Create or update a workflow definition in the SuprSend dashboard. "
+        "Accepts the full workflow JSON (same shape returned by get_workflow). "
+        "When commit=True (default) the workflow is validated and deployed immediately; "
+        "set commit=False to save as a draft without deploying."
+    )
+    args_schema = PushWorkflowInput
+    permission_subcategory = "workflows"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+    open_world = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        workflow_slug: str = "",
+        workflow: dict = None,
+        commit: bool = True,
+        commit_message: str = "",
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not workflow_slug:
+            return "Error: workflow_slug is required."
+        if not workflow:
+            return "Error: workflow definition is required."
+        try:
+            result = await self._mgmnt_run(
+                client,
+                lambda mgmt, **kw: mgmt.workflows.push(
+                    kw.pop("workspace"),
+                    kw.pop("workflow_slug"),
+                    kw.pop("workflow"),
+                    commit=kw.pop("commit"),
+                    commit_message=kw.pop("commit_message"),
+                    **kw,
+                ),
+                workspace=ws,
+                workflow_slug=workflow_slug,
+                workflow=workflow,
+                commit=commit,
+                commit_message=commit_message,
+            )
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return f"Error pushing workflow '{workflow_slug}': {e}"
