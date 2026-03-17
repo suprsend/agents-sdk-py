@@ -1,33 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import requests
 
+from suprsend_management.api.base import BaseApi
 from suprsend_management.exception import SuprsendManagementException
 
-if TYPE_CHECKING:
-    from suprsend_management.client import SuprsendManagement
 
-
-class PreferenceCategoriesApi:
+class PreferenceCategoriesApi(BaseApi):
     """
     Management API callers for GET v1/{ws}/notification_category/
     """
 
-    def __init__(self, config: "SuprsendManagement") -> None:
-        self.config = config
-
     def _url(self, workspace: str) -> str:
         return f"{self.config.base_url}/v1/{workspace}/preference_category/"
-
-    def _headers(self, extra: dict | None = None) -> dict:
-        h: dict = {"Content-Type": "application/json"}
-        if self.config.auth:
-            h.update(self.config.auth.get_headers())
-        if extra:
-            h.update(extra)
-        return h
 
     def list(self, workspace: str, extra_headers: dict | None = None) -> dict:
         """

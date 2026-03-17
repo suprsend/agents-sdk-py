@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 from typing_extensions import TypedDict
 
@@ -60,7 +60,7 @@ class Permissions(TypedDict, total=False):
             subscribers={"read": True, "manage": True},
             events={"manage": True},
             tenants={"read": True},
-            management=ManagementPermissions(workspaces={"read": True}),
+            management=ManagementPermissions(workflows={"read": True}),
         )
     """
     workflows: WorkflowPermissions
