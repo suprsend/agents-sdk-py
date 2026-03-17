@@ -1,11 +1,13 @@
 import asyncio
 import uuid
+from typing import Union
 import yaml
 
 from pydantic import BaseModel, Field
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
+from suprsend_agents_toolkit.tools._utils import evaluate_jsonnet, validate_with_jsonpath
 
 try:
     from suprsend.workflow_request import WorkflowTriggerRequest
@@ -13,61 +15,9 @@ except ImportError:
     WorkflowTriggerRequest = None  # type: ignore[assignment,misc]
 
 
+# Backward-compat alias — kept in case external code imports _validate_trigger_data
 def _validate_trigger_data(data: dict, trigger_inputs: dict) -> str | None:
-    """
-    Validate data against the trigger_inputs schema.
-
-    Handles two schema shapes:
-    - {field: {type, required, description}}
-    - {properties: {field: {type, required, description}}}
-
-    Returns None if valid, or a descriptive error string listing issues.
-    """
-    # Unwrap JSON Schema-style envelope if present
-    fields = trigger_inputs.get("properties") or trigger_inputs
-
-    missing = []
-    wrong_type = []
-
-    for field_name, field_def in fields.items():
-        if not isinstance(field_def, dict):
-            continue
-        required = field_def.get("required", False)
-        expected_type = field_def.get("type", "")
-
-        if required and field_name not in data:
-            missing.append(field_name)
-            continue
-
-        if expected_type and field_name in data:
-            value = data[field_name]
-            type_map = {
-                "string": str,
-                "str": str,
-                "integer": int,
-                "int": int,
-                "number": (int, float),
-                "float": float,
-                "boolean": bool,
-                "bool": bool,
-                "array": list,
-                "list": list,
-                "object": dict,
-                "dict": dict,
-            }
-            expected_py = type_map.get(expected_type.lower())
-            if expected_py and not isinstance(value, expected_py):
-                wrong_type.append(
-                    f"  {field_name}: expected {expected_type}, got {type(value).__name__}"
-                )
-
-    errors = []
-    if missing:
-        errors.append(f"Missing required fields: {', '.join(missing)}")
-    if wrong_type:
-        errors.append("Type mismatches:\n" + "\n".join(wrong_type))
-
-    return "\n".join(errors) if errors else None
+    return validate_with_jsonpath(data, trigger_inputs)
 
 
 class TriggerWorkflowInput(BaseModel):
@@ -80,10 +30,10 @@ class TriggerWorkflowInput(BaseModel):
             "or a user object with at least a distinct_id key."
         )
     )
-    data: dict = Field(
+    data: Union[dict, str] = Field(
         default_factory=dict,
         description=(
-            "Key-value pairs passed as workflow data. "
+            "Key-value pairs passed as workflow data. Either a plain dict or a Jsonnet template string. "
             "Must satisfy the workflow's trigger_inputs schema. "
             "Call get_workflow first to see which fields are required."
         ),
@@ -127,7 +77,7 @@ class TriggerWorkflowTool(ManagementTool):
         client: AsyncSuprSendClient,
         workflow_slug: str = "",
         recipients: list = None,
-        data: dict = None,
+        data: Union[dict, str] = None,
         tenant_id: str = "",
         idempotency_key: str = "",
         **kwargs,
@@ -141,6 +91,13 @@ class TriggerWorkflowTool(ManagementTool):
             return "Error: recipients is required and must be a non-empty list."
 
         data = data or {}
+
+        # Evaluate Jsonnet if needed
+        try:
+            data = evaluate_jsonnet(data)
+        except (ImportError, ValueError) as e:
+            return f"Error evaluating data: {e}"
+
         # Always use an idempotency key — generate one if not supplied
         if not idempotency_key:
             idempotency_key = str(uuid.uuid4())
@@ -164,7 +121,7 @@ class TriggerWorkflowTool(ManagementTool):
 
         # Validate data against schema if one is defined
         if trigger_inputs:
-            error = _validate_trigger_data(data, trigger_inputs)
+            error = validate_with_jsonpath(data, trigger_inputs)
             if error:
                 schema_yaml = yaml.dump(trigger_inputs, default_flow_style=False)
                 return (

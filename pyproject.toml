@@ -6,6 +6,8 @@ dependencies = [
     "aiohttp==3.13.3",
     "pydantic==2.12.5",
     "suprsend-py-sdk @ git+https://github.com/suprsend/suprsend-py-sdk.git@tool-apis",
+    "jsonnet==0.21.0",
+    "jsonpath-ng==1.8.0",
 ]
 
 [project.optional-dependencies]
