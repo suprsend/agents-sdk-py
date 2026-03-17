@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 import yaml
 
 from pydantic import BaseModel, Field
@@ -140,6 +141,9 @@ class TriggerWorkflowTool(ManagementTool):
             return "Error: recipients is required and must be a non-empty list."
 
         data = data or {}
+        # Always use an idempotency key — generate one if not supplied
+        if not idempotency_key:
+            idempotency_key = str(uuid.uuid4())
 
         # Fetch workflow definition to get trigger_inputs schema
         try:
@@ -174,15 +178,30 @@ class TriggerWorkflowTool(ManagementTool):
                 return "Error: suprsend SDK not installed. Install suprsend to use this tool."
 
             sdk = await client.get_sdk_instance(ws)
-            body: dict = {"workflow": workflow_slug, "recipients": recipients, "data": data}
+            body: dict = {
+                "workflow": workflow_slug,
+                "recipients": recipients,
+                "data": data,
+                "$idempotency_key": idempotency_key,
+            }
             if tenant_id:
                 body["tenant_id"] = tenant_id
-            if idempotency_key:
-                body["$idempotency_key"] = idempotency_key
 
             result = await asyncio.to_thread(
                 sdk.workflows.trigger, WorkflowTriggerRequest(body)
             )
-            return yaml.dump(result, default_flow_style=False)
+            summary: dict = {
+                "triggered": {
+                    "workflow": workflow_slug,
+                    "workspace": ws,
+                    "recipients": recipients,
+                    "data": data,
+                    "idempotency_key": idempotency_key,
+                }
+            }
+            if tenant_id:
+                summary["triggered"]["tenant_id"] = tenant_id
+            summary["api_response"] = result
+            return yaml.dump(summary, default_flow_style=False)
         except Exception as e:
             return f"Error triggering workflow '{workflow_slug}': {e}"
