@@ -98,3 +98,53 @@ class WorkflowsApi(BaseApi):
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
         return resp.json()
+
+    def push(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        workflow: dict,
+        commit: bool = False,
+        commit_message: str = "",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        POST /v1/{workspace}/workflow/{slug}/
+        Creates or updates a workflow. commit=False saves as draft; commit=True deploys immediately.
+        Returns: {"validation_result": {"is_valid": bool, "errors": [...]}}
+        """
+        params = {"commit": "true" if commit else "false"}
+        if commit_message:
+            params["commit_message"] = commit_message
+        resp = requests.post(
+            self._url(workspace, workflow_slug),
+            headers=self._headers(extra_headers),
+            params=params,
+            json=workflow,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def commit(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        commit_message: str = "",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        PATCH /v1/{workspace}/workflow/{slug}/commit/
+        Promotes the saved draft to live. Lightweight — no workflow JSON needed.
+        """
+        body = {}
+        if commit_message:
+            body["commit_message"] = commit_message
+        resp = requests.patch(
+            self._url(workspace, workflow_slug) + "commit/",
+            headers=self._headers(extra_headers),
+            json=body,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
