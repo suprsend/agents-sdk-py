@@ -73,6 +73,9 @@ class TrackEventTool(ManagementTool):
         idempotency_key: str = "",
         **kwargs,
     ) -> str:
+        if Event is None:
+            return "Error: suprsend SDK not installed. Install suprsend to use this tool."
+
         ws = self._workspace(client, kwargs)
         if not ws:
             return "Error: workspace is required."
@@ -95,14 +98,12 @@ class TrackEventTool(ManagementTool):
 
         # Fetch event definition to get payload_schema
         try:
-            event_def = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.events.get(kw.pop("workspace"), kw.pop("event_name"), **kw),
-                workspace=ws,
-                event_name=event_name,
+            mgmt, headers = self._mgmnt(client)
+            event_def = await asyncio.to_thread(
+                mgmt.events.get, ws, event_name, extra_headers=headers
             )
         except Exception as e:
-            return f"Error fetching event '{event_name}': {e}"
+            return self._api_error(e, f"fetching event '{event_name}'")
 
         payload_schema = event_def.get("payload_schema") or {}
 
@@ -118,9 +119,6 @@ class TrackEventTool(ManagementTool):
 
         # Track via SDK
         try:
-            if Event is None:
-                return "Error: suprsend SDK not installed. Install suprsend to use this tool."
-
             sdk = await client.get_sdk_instance(ws)
             event = Event(
                 distinct_id,
@@ -145,4 +143,4 @@ class TrackEventTool(ManagementTool):
             summary["api_response"] = result
             return yaml.dump(summary, default_flow_style=False)
         except Exception as e:
-            return f"Error tracking event '{event_name}': {e}"
+            return self._api_error(e, f"tracking event '{event_name}'")

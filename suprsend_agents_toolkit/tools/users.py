@@ -54,7 +54,7 @@ class GetUserTool(SuprSendTool):
             result = await asyncio.to_thread(sdk.users.get, distinct_id)
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching user '{distinct_id}'")
 
 
 # ── GetUserPreferenceTool ─────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ class GetUserPreferenceTool(SuprSendTool):
                 )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching preferences for user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching preferences for user '{distinct_id}'")
 
 
 # ── GetUserObjectSubscriptionsTool ────────────────────────────────────────────
@@ -220,7 +220,7 @@ class GetUserObjectSubscriptionsTool(SuprSendTool):
             result = await asyncio.to_thread(sdk.users.get_objects_subscribed_to, distinct_id, options)
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching object subscriptions for user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching object subscriptions for user '{distinct_id}'")
 
 
 # ── GetUserListSubscriptionsTool ──────────────────────────────────────────────
@@ -276,4 +276,4 @@ class GetUserListSubscriptionsTool(SuprSendTool):
             result = await asyncio.to_thread(sdk.users.get_lists_subscribed_to, distinct_id, options)
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching list subscriptions for user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching list subscriptions for user '{distinct_id}'")

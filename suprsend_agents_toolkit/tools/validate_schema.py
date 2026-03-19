@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 from typing import Union
 
@@ -75,29 +76,20 @@ class ValidateSchemaTool(ManagementTool):
         # Fetch schema
         schema = {}
         try:
+            mgmt, headers = self._mgmnt(client)
             if workflow_slug:
-                result = await self._mgmnt_run(
-                    client,
-                    lambda mgmt, **kw: mgmt.workflows.get(
-                        kw.pop("workspace"), kw.pop("workflow_slug"), **kw
-                    ),
-                    workspace=ws,
-                    workflow_slug=workflow_slug,
+                result = await asyncio.to_thread(
+                    mgmt.workflows.get, ws, workflow_slug, extra_headers=headers
                 )
                 schema = result.get("trigger_inputs") or {}
             else:
-                result = await self._mgmnt_run(
-                    client,
-                    lambda mgmt, **kw: mgmt.events.get(
-                        kw.pop("workspace"), kw.pop("event_name"), **kw
-                    ),
-                    workspace=ws,
-                    event_name=event_name,
+                result = await asyncio.to_thread(
+                    mgmt.events.get, ws, event_name, extra_headers=headers
                 )
                 schema = result.get("payload_schema") or {}
         except Exception as e:
             target = workflow_slug or event_name
-            return f"Error fetching schema for '{target}': {e}"
+            return self._api_error(e, f"fetching schema for '{target}'")
 
         if not schema:
             return "No schema defined for this workflow/event — any payload is accepted."

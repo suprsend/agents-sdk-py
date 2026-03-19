@@ -5,6 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiohttp==3.13.3",
     "pydantic==2.12.5",
+    "pyyaml==6.0.2",
     "suprsend-py-sdk @ git+https://github.com/suprsend/suprsend-py-sdk.git@tool-apis",
     "jsonpath-ng==1.8.0",
 ]

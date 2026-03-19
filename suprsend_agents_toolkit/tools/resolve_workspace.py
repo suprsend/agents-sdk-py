@@ -51,10 +51,9 @@ class ResolveWorkspaceTool(SuprSendTool):
             )
 
         try:
-            key, _ = await client.exchange_workspace_credentials(ws)
+            await client.exchange_workspace_credentials(ws)
             return (
                 f"Workspace '{ws}' resolved. "
-                f"Key prefix: {key[:8]}… "
                 f"You can now call workspace-level tools."
             )
         except Exception as exc:

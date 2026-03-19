@@ -82,6 +82,9 @@ class TriggerWorkflowTool(ManagementTool):
         idempotency_key: str = "",
         **kwargs,
     ) -> str:
+        if WorkflowTriggerRequest is None:
+            return "Error: suprsend SDK not installed. Install suprsend to use this tool."
+
         ws = self._workspace(client, kwargs)
         if not ws:
             return "Error: workspace is required."
@@ -104,18 +107,12 @@ class TriggerWorkflowTool(ManagementTool):
 
         # Fetch workflow definition to get trigger_inputs schema
         try:
-            workflow_def = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.get(
-                    kw.pop("workspace"),
-                    kw.pop("workflow_slug"),
-                    **kw,
-                ),
-                workspace=ws,
-                workflow_slug=workflow_slug,
+            mgmt, headers = self._mgmnt(client)
+            workflow_def = await asyncio.to_thread(
+                mgmt.workflows.get, ws, workflow_slug, extra_headers=headers
             )
         except Exception as e:
-            return f"Error fetching workflow '{workflow_slug}': {e}"
+            return self._api_error(e, f"fetching workflow '{workflow_slug}'")
 
         trigger_inputs = workflow_def.get("trigger_inputs") or {}
 
@@ -131,9 +128,6 @@ class TriggerWorkflowTool(ManagementTool):
 
         # Trigger via SDK
         try:
-            if WorkflowTriggerRequest is None:
-                return "Error: suprsend SDK not installed. Install suprsend to use this tool."
-
             sdk = await client.get_sdk_instance(ws)
             body: dict = {
                 "workflow": workflow_slug,
@@ -161,4 +155,4 @@ class TriggerWorkflowTool(ManagementTool):
             summary["api_response"] = result
             return yaml.dump(summary, default_flow_style=False)
         except Exception as e:
-            return f"Error triggering workflow '{workflow_slug}': {e}"
+            return self._api_error(e, f"triggering workflow '{workflow_slug}'")

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import requests
+from urllib.parse import quote
 
-from suprsend_management.api.base import BaseApi
+from suprsend_management.api.base import BaseApi, _DEFAULT_TIMEOUT
 from suprsend_management.exception import SuprsendManagementException
 
 
@@ -12,9 +13,9 @@ class WorkflowsApi(BaseApi):
     """
 
     def _url(self, workspace: str, workflow_slug: str | None = None) -> str:
-        base = f"{self.config.base_url}/v1/{workspace}/workflow/"
+        base = f"{self.config.base_url}/v1/{quote(workspace, safe='')}/workflow/"
         if workflow_slug:
-            return f"{base}{workflow_slug}/"
+            return f"{base}{quote(workflow_slug, safe='')}/"
         return base
 
     def list(
@@ -66,6 +67,7 @@ class WorkflowsApi(BaseApi):
             self._url(workspace),
             headers=self._headers(extra_headers),
             params=params or None,
+            timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
@@ -94,6 +96,7 @@ class WorkflowsApi(BaseApi):
         resp = requests.get(
             self._url(workspace, workflow_slug),
             headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
@@ -121,6 +124,7 @@ class WorkflowsApi(BaseApi):
             headers=self._headers(extra_headers),
             params=params,
             json=workflow,
+            timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
@@ -144,6 +148,7 @@ class WorkflowsApi(BaseApi):
             self._url(workspace, workflow_slug) + "commit/",
             headers=self._headers(extra_headers),
             json=body,
+            timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)

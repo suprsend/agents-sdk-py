@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+import time
 from collections.abc import Callable
 from typing import Any, TYPE_CHECKING
 
@@ -44,12 +45,16 @@ class AsyncSuprSendClient:
         auth: SuprSendAuth | None,
         context: "ToolContext",
         jwt_getter: "Callable[[Any], str] | None" = None,
+        policy: dict | None = None,
     ) -> None:
         self.auth = auth
         self.context = context
         self.base_url = context.base_url.rstrip("/")
         self.mgmnt_url = context.mgmnt_url.rstrip("/")
         self.jwt_getter = jwt_getter  # Callable[[config], str] — returns JWT or ""
+        # Enforcement policy for tool behaviour annotations.
+        # Keys: allow_writes (bool), allow_destructive (bool).
+        self.policy: dict = policy or {"allow_writes": True, "allow_destructive": True}
         # workspace slug → (key, secret) — populated by exchange_workspace_credentials
         self._workspace_cache: dict[str, tuple[str, str]] = {}
         # Persistent session — created lazily, shared with _with_jwt() children
@@ -60,10 +65,11 @@ class AsyncSuprSendClient:
         Return a derived client using JWTAuth.
         Shares the same context and _workspace_cache as the parent so an
         exchange already performed is not repeated.
+        Each derived client owns its own session so that closing one does
+        not affect the parent or any sibling clients.
         """
-        new = AsyncSuprSendClient(auth=JWTAuth(jwt_token), context=self.context, jwt_getter=self.jwt_getter)
+        new = AsyncSuprSendClient(auth=JWTAuth(jwt_token), context=self.context, jwt_getter=self.jwt_getter, policy=self.policy)
         new._workspace_cache = self._workspace_cache
-        new._session = self._session  # share the connection pool
         return new
 
     async def close(self) -> None:
@@ -110,6 +116,11 @@ class AsyncSuprSendClient:
         user/org, so two organisations that happen to share the same workspace
         slug will never collide in the cache.  For ServiceToken auth the token
         is already org-scoped, so the workspace slug alone is sufficient.
+
+        Also validates JWT expiry so an expired token cannot initiate a new
+        workspace credential exchange (cached entries from a previous valid
+        session remain usable since the workspace key/secret are independent
+        of the JWT lifetime).
         """
         if isinstance(self.auth, JWTAuth):
             try:
@@ -121,6 +132,9 @@ class AsyncSuprSendClient:
             user_id = claims.get("user_id")
             if not user_id:
                 raise ValueError("JWT payload missing user_id — cannot safely scope workspace cache")
+            exp = claims.get("exp")
+            if exp is not None and time.time() > exp:
+                raise ValueError("JWT token has expired — re-authenticate to continue.")
             return f"{user_id}:{workspace}"
         return workspace
 
@@ -171,14 +185,3 @@ class AsyncSuprSendClient:
         from suprsend_management import SuprsendManagement
         return SuprsendManagement(base_url=self.mgmnt_url)
 
-    # ── Management API (service token / JWT) ──────────────────────────────────
-
-    async def mgmnt_get(self, path: str, params: dict | None = None) -> Any:
-        """GET against the management API (service token / JWT auth)."""
-        url = f"{self.mgmnt_url}/{path.lstrip('/')}"
-        return await self.get(url, params=params)
-
-    async def mgmnt_post(self, path: str, payload: dict) -> Any:
-        """POST against the management API (service token / JWT auth)."""
-        url = f"{self.mgmnt_url}/{path.lstrip('/')}"
-        return await self.post(url, payload)

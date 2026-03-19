@@ -31,6 +31,10 @@ class ServiceTokenAuth(SuprSendAuth):
     def __init__(self, token: str) -> None:
         self.token = token
 
+    def __repr__(self) -> str:
+        masked = self.token[:6] + "…" if len(self.token) > 6 else "…"
+        return f"ServiceTokenAuth(token='{masked}')"
+
     def get_headers(self) -> dict[str, str]:
         return {
             "Authorization": f"ServiceToken {self.token}",
@@ -61,6 +65,10 @@ class JWTAuth(SuprSendAuth):
 
     def __init__(self, token: str) -> None:
         self.token = token
+
+    def __repr__(self) -> str:
+        masked = self.token[:6] + "…" if len(self.token) > 6 else "…"
+        return f"JWTAuth(token='{masked}')"
 
     def get_headers(self) -> dict[str, str]:
         return {
@@ -110,6 +118,7 @@ class JWTAuth(SuprSendAuth):
         Try cookie first, fall back to Authorization header.
         cookie_name required for structured cookies; omit if cookie is a raw JWT.
         """
+        cookie_error: ValueError | None = None
         if cookie_header:
             cookie_header = cookie_header.strip()
             if "=" not in cookie_header:
@@ -118,15 +127,17 @@ class JWTAuth(SuprSendAuth):
             if cookie_name:
                 try:
                     return cls.from_cookie(cookie_header, cookie_name=cookie_name)
-                except ValueError:
-                    pass
+                except ValueError as e:
+                    cookie_error = e
         if authorization_header:
             try:
                 return cls.from_header(authorization_header)
             except ValueError:
                 pass
-        raise ValueError(
-            "No JWT found. Checked "
-            + (f"cookie '{cookie_name}' and " if cookie_name else "")
-            + "Authorization header."
-        )
+        parts = ["No JWT found."]
+        if cookie_error:
+            parts.append(f"Cookie '{cookie_name}' error: {cookie_error}.")
+        elif cookie_name:
+            parts.append(f"Cookie '{cookie_name}' not present.")
+        parts.append("Authorization header also missing or invalid.")
+        raise ValueError(" ".join(parts))

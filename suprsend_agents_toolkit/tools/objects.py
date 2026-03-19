@@ -60,7 +60,7 @@ class GetObjectTool(SuprSendTool):
             result = await asyncio.to_thread(sdk.objects.get, object_type, object_id)
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching object '{object_type}/{object_id}': {e}"
+            return self._api_error(e, f"fetching object '{object_type}/{object_id}'")
 
 
 # ── GetObjectPreferenceTool ───────────────────────────────────────────────────
@@ -140,7 +140,7 @@ class GetObjectPreferenceTool(SuprSendTool):
                 )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching preferences for object '{object_type}/{object_id}': {e}"
+            return self._api_error(e, f"fetching preferences for object '{object_type}/{object_id}'")
 
 
 # ── GetObjectSubscriptionsTool ────────────────────────────────────────────────
@@ -213,4 +213,4 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching subscriptions for object '{object_type}/{object_id}': {e}"
+            return self._api_error(e, f"fetching subscriptions for object '{object_type}/{object_id}'")

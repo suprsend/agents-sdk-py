@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 
 from pydantic import BaseModel, Field
@@ -40,11 +41,12 @@ class GetPreferenceCategoriesTool(ManagementTool):
         if not ws:
             return "Error: workspace is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.preference_categories.list(kw.pop("workspace"), **kw),
-                workspace=ws,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.preference_categories.list,
+                ws,
+                extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching preference categories for workspace '{ws}': {e}"
+            return self._api_error(e, f"fetching preference categories for workspace '{ws}'")

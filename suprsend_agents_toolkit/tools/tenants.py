@@ -53,7 +53,7 @@ class GetTenantTool(SuprSendTool):
             result = await asyncio.to_thread(sdk.tenants.get, tenant_id)
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching tenant '{tenant_id}': {e}"
+            return self._api_error(e, f"fetching tenant '{tenant_id}'")
 
 
 # ── GetTenantPreferenceTool ───────────────────────────────────────────────────
@@ -121,4 +121,4 @@ class GetTenantPreferenceTool(SuprSendTool):
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching preferences for tenant '{tenant_id}': {e}"
+            return self._api_error(e, f"fetching preferences for tenant '{tenant_id}'")

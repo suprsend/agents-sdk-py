@@ -14,18 +14,21 @@ def evaluate_jsonnet(value: Union[str, dict]) -> dict:
         import _gojsonnet as jsonnet  # jsonnet package exposes _gojsonnet
     except ImportError:
         raise ImportError("Install 'jsonnet' to use Jsonnet template support.")
+
+    def _block_import(base: str, rel: str) -> tuple[str, str]:
+        raise RuntimeError(
+            f"Jsonnet import not permitted: '{rel}'. "
+            "File system and network imports are disabled for security."
+        )
+
     try:
-        evaluated = jsonnet.evaluate_snippet("payload", value)
+        evaluated = jsonnet.evaluate_snippet("payload", value, import_callback=_block_import)
     except Exception as e:
         raise ValueError(f"Jsonnet evaluation error: {e}")
     return json.loads(evaluated)
 
 
-class _Sentinel:
-    pass
-
-
-_MISSING = _Sentinel()
+_MISSING = object()  # sentinel for missing values
 
 
 def validate_with_jsonpath(data: dict, schema: dict) -> str | None:
@@ -67,10 +70,10 @@ def validate_with_jsonpath(data: dict, schema: dict) -> str | None:
         else:
             value = data.get(field_name, _MISSING)
 
-        if required and isinstance(value, _Sentinel):
+        if required and value is _MISSING:
             missing.append(field_name)
             continue
-        if expected_type and not isinstance(value, _Sentinel):
+        if expected_type and value is not _MISSING:
             expected_py = type_map.get(expected_type.lower())
             if expected_py and not isinstance(value, expected_py):
                 wrong_type.append(

@@ -1,4 +1,4 @@
-import json
+import asyncio
 import yaml
 
 from pydantic import BaseModel, Field
@@ -35,7 +35,9 @@ class ListWorkflowsInput(BaseModel):
     )
     limit: int = Field(
         default=10,
-        description="Maximum number of workflows to return (max 50).",
+        ge=1,
+        le=50,
+        description="Maximum number of workflows to return (1–50).",
     )
     offset: int = Field(
         default=0,
@@ -82,29 +84,21 @@ class ListWorkflowsTool(ManagementTool):
         if not ws:
             return "Error: workspace is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.list(
-                    kw.pop("workspace"),
-                    search=kw.pop("search") or None,
-                    slugs=kw.pop("slugs") or None,
-                    include_archived=kw.pop("include_archived"),
-                    order_by=kw.pop("order_by") or None,
-                    limit=kw.pop("limit"),
-                    offset=kw.pop("offset"),
-                    **kw,
-                ),
-                workspace=ws,
-                search=search,
-                slugs=slugs or [],
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.list,
+                ws,
+                search=search or None,
+                slugs=slugs or None,
                 include_archived=include_archived,
-                order_by=order_by,
+                order_by=order_by or None,
                 limit=limit,
                 offset=offset,
+                extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error listing workflows for workspace '{ws}': {e}"
+            return self._api_error(e, f"listing workflows for workspace '{ws}'")
 
 
 # ── GetWorkflowTool ───────────────────────────────────────────────────────────
@@ -147,19 +141,16 @@ class GetWorkflowTool(ManagementTool):
         if not workflow_slug:
             return "Error: workflow_slug is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.get(
-                    kw.pop("workspace"),
-                    kw.pop("workflow_slug"),
-                    **kw,
-                ),
-                workspace=ws,
-                workflow_slug=workflow_slug,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.get,
+                ws,
+                workflow_slug,
+                extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching workflow '{workflow_slug}': {e}"
+            return self._api_error(e, f"fetching workflow '{workflow_slug}'")
 
 
 # ── PushWorkflowTool ──────────────────────────────────────────────────────────
@@ -207,25 +198,19 @@ class PushWorkflowTool(ManagementTool):
         if not workflow:
             return "Error: workflow definition is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.push(
-                    kw.pop("workspace"),
-                    kw.pop("workflow_slug"),
-                    kw.pop("workflow"),
-                    commit=kw.pop("commit"),
-                    commit_message=kw.pop("commit_message"),
-                    **kw,
-                ),
-                workspace=ws,
-                workflow_slug=workflow_slug,
-                workflow=workflow,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.push,
+                ws,
+                workflow_slug,
+                workflow,
                 commit=commit,
                 commit_message=commit_message,
+                extra_headers=headers,
             )
-            return json.dumps(result)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error pushing workflow '{workflow_slug}': {e}"
+            return self._api_error(e, f"pushing workflow '{workflow_slug}'")
 
 
 # ── CommitWorkflowTool ────────────────────────────────────────────────────────
@@ -265,18 +250,14 @@ class CommitWorkflowTool(ManagementTool):
         if not workflow_slug:
             return "Error: workflow_slug is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.commit(
-                    kw.pop("workspace"),
-                    kw.pop("workflow_slug"),
-                    commit_message=kw.pop("commit_message"),
-                    **kw,
-                ),
-                workspace=ws,
-                workflow_slug=workflow_slug,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.commit,
+                ws,
+                workflow_slug,
                 commit_message=commit_message,
+                extra_headers=headers,
             )
-            return json.dumps(result)
+            return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error committing workflow '{workflow_slug}': {e}"
+            return self._api_error(e, f"committing workflow '{workflow_slug}'")

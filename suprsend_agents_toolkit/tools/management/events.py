@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 
 from pydantic import BaseModel, Field
@@ -45,12 +46,13 @@ class GetEventDetailsTool(ManagementTool):
         if not event_name:
             return "Error: event_name is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.events.get(kw.pop("workspace"), kw.pop("event_name"), **kw),
-                workspace=ws,
-                event_name=event_name,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.events.get,
+                ws,
+                event_name,
+                extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return f"Error fetching event '{event_name}' in workspace '{ws}': {e}"
+            return self._api_error(e, f"fetching event '{event_name}' in workspace '{ws}'")

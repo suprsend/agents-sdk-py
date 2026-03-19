@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass  # used by DeferredToolCall/DeferredToolCallResult
 from typing import Any
 from typing_extensions import TypedDict
 
@@ -68,20 +68,6 @@ class Permissions(TypedDict, total=False):
     events: ResourcePermissions
     tenants: ResourcePermissions
     management: ManagementPermissions
-
-
-# ── Workspace credentials ─────────────────────────────────────────────────────
-
-@dataclass
-class WorkspaceCredentials:
-    """
-    Workspace key + secret returned by the exchange API.
-    Stored in the client's cache after the first resolve_workspace call.
-    """
-
-    workspace: str
-    key: str
-    secret: str
 
 
 # ── Human-in-the-Loop (future) ────────────────────────────────────────────────
