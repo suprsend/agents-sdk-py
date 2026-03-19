@@ -103,7 +103,11 @@ class TrackEventTool(ManagementTool):
                 mgmt.events.get, ws, event_name, extra_headers=headers
             )
         except Exception as e:
-            return self._api_error(e, f"fetching event '{event_name}'")
+            return self._api_error(
+                e,
+                f"fetching event '{event_name}' for schema validation"
+                " — if using JWT auth, ensure api_secret is configured in ToolContext",
+            )
 
         payload_schema = event_def.get("payload_schema") or {}
 
@@ -117,6 +121,9 @@ class TrackEventTool(ManagementTool):
                     f"Required payload schema:\n{schema_yaml}"
                 )
 
+        # Resolve tenant: explicit arg → context default → omit
+        tenant = tenant_id or client.context.tenant_id or ""
+
         # Track via SDK
         try:
             sdk = await client.get_sdk_instance(ws)
@@ -125,7 +132,7 @@ class TrackEventTool(ManagementTool):
                 event_name,
                 properties,
                 idempotency_key=idempotency_key,
-                tenant_id=tenant_id or None,
+                tenant_id=tenant or None,
             )
             result = await asyncio.to_thread(sdk.track_event, event)
 
@@ -138,8 +145,8 @@ class TrackEventTool(ManagementTool):
                     "idempotency_key": idempotency_key,
                 }
             }
-            if tenant_id:
-                summary["tracked"]["tenant_id"] = tenant_id
+            if tenant:
+                summary["tracked"]["tenant_id"] = tenant
             summary["api_response"] = result
             return yaml.dump(summary, default_flow_style=False)
         except Exception as e:

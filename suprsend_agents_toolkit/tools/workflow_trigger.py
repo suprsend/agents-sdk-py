@@ -15,10 +15,6 @@ except ImportError:
     WorkflowTriggerRequest = None  # type: ignore[assignment,misc]
 
 
-# Backward-compat alias — kept in case external code imports _validate_trigger_data
-def _validate_trigger_data(data: dict, trigger_inputs: dict) -> str | None:
-    return validate_with_jsonpath(data, trigger_inputs)
-
 
 class TriggerWorkflowInput(BaseModel):
     workflow_slug: str = Field(
@@ -112,7 +108,11 @@ class TriggerWorkflowTool(ManagementTool):
                 mgmt.workflows.get, ws, workflow_slug, extra_headers=headers
             )
         except Exception as e:
-            return self._api_error(e, f"fetching workflow '{workflow_slug}'")
+            return self._api_error(
+                e,
+                f"fetching workflow '{workflow_slug}' for schema validation"
+                " — if using JWT auth, ensure api_secret is configured in ToolContext",
+            )
 
         trigger_inputs = workflow_def.get("trigger_inputs") or {}
 
@@ -126,6 +126,9 @@ class TriggerWorkflowTool(ManagementTool):
                     f"Required trigger_inputs schema:\n{schema_yaml}"
                 )
 
+        # Resolve tenant: explicit arg → context default → omit
+        tenant = tenant_id or client.context.tenant_id or ""
+
         # Trigger via SDK
         try:
             sdk = await client.get_sdk_instance(ws)
@@ -135,8 +138,8 @@ class TriggerWorkflowTool(ManagementTool):
                 "data": data,
                 "$idempotency_key": idempotency_key,
             }
-            if tenant_id:
-                body["tenant_id"] = tenant_id
+            if tenant:
+                body["tenant_id"] = tenant
 
             result = await asyncio.to_thread(
                 sdk.workflows.trigger, WorkflowTriggerRequest(body)
@@ -150,8 +153,8 @@ class TriggerWorkflowTool(ManagementTool):
                     "idempotency_key": idempotency_key,
                 }
             }
-            if tenant_id:
-                summary["triggered"]["tenant_id"] = tenant_id
+            if tenant:
+                summary["triggered"]["tenant_id"] = tenant
             summary["api_response"] = result
             return yaml.dump(summary, default_flow_style=False)
         except Exception as e:

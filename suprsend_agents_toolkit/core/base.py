@@ -201,7 +201,13 @@ class SuprSendTool(ABC):
         async def _run(run_config: RunnableConfig, **kwargs: Any) -> str:
             client = tool_self._resolve_client(run_config)
             tool_self._enforce_policy(client)
-            return await tool_self.execute(client=client, **kwargs)
+            try:
+                return await tool_self.execute(client=client, **kwargs)
+            finally:
+                # JWT-derived clients own their own aiohttp session; close it
+                # so connections are not leaked across tool calls.
+                if client is not tool_self._client:
+                    await client.close()
 
         return StructuredTool.from_function(
             coroutine=_run,

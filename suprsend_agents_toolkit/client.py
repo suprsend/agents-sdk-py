@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import re
@@ -57,6 +58,8 @@ class AsyncSuprSendClient:
         self.policy: dict = policy or {"allow_writes": True, "allow_destructive": True}
         # workspace slug → (key, secret) — populated by exchange_workspace_credentials
         self._workspace_cache: dict[str, tuple[str, str]] = {}
+        # Lock guarding cache writes; shared with _with_jwt() children via _with_jwt()
+        self._cache_lock: asyncio.Lock = asyncio.Lock()
         # Persistent session — created lazily, shared with _with_jwt() children
         self._session: aiohttp.ClientSession | None = None
 
@@ -70,6 +73,7 @@ class AsyncSuprSendClient:
         """
         new = AsyncSuprSendClient(auth=JWTAuth(jwt_token), context=self.context, jwt_getter=self.jwt_getter, policy=self.policy)
         new._workspace_cache = self._workspace_cache
+        new._cache_lock = self._cache_lock
         return new
 
     async def close(self) -> None:
@@ -155,12 +159,18 @@ class AsyncSuprSendClient:
         if cache_key in self._workspace_cache:
             return self._workspace_cache[cache_key]
 
-        url = f"{self.base_url}/v1/{workspace}/ws_key/bridge"
-        result = await self.get(url)
-        key = result["key"]
-        secret = result["secret"]
-        self._workspace_cache[cache_key] = (key, secret)
-        return key, secret
+        async with self._cache_lock:
+            # Double-check after acquiring the lock — another coroutine may have
+            # populated the cache while we were waiting.
+            if cache_key in self._workspace_cache:
+                return self._workspace_cache[cache_key]
+
+            url = f"{self.base_url}/v1/{workspace}/ws_key/bridge"
+            result = await self.get(url)
+            key = result["key"]
+            secret = result["secret"]
+            self._workspace_cache[cache_key] = (key, secret)
+            return key, secret
 
     async def get_sdk_instance(self, workspace: str):
         """
