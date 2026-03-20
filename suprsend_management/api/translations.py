@@ -38,7 +38,7 @@ class TranslationsApi(BaseApi):
         """POST /v1/{workspace}/translation/content/{filename}/ — create or update a translation file."""
         resp = requests.post(
             self._url(workspace, filename),
-            json={"content": content},
+            json={"locale": filename, "content": content},
             headers=self._headers(extra_headers),
             timeout=_DEFAULT_TIMEOUT,
         )

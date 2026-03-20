@@ -55,27 +55,22 @@ class GetPreferenceCategoriesTool(ManagementTool):
 # ── UpdatePreferenceCategoryTool ──────────────────────────────────────────────
 
 class UpdatePreferenceCategoryInput(BaseModel):
-    category_slug: str = Field(
-        description="Slug identifier of the preference category to update."
-    )
-    name: str = Field(
-        default="",
-        description="Display name for the category.",
-    )
-    description: str = Field(
-        default="",
-        description="Description of the category shown in preference centers.",
-    )
-    default_preference: str = Field(
-        default="",
-        description="Default preference for users in this category: 'opt_in' or 'opt_out'.",
-    )
-    default_mandatory_channels: list = Field(
-        default=[],
+    root_categories: list = Field(
         description=(
-            "Channels that cannot be opted out of for this category "
-            "(e.g. ['email', 'sms']). Only applies when default_preference is 'opt_in'."
+            "Full preference category tree to save. Must include all three root categories: "
+            "'system', 'transactional', and 'promotional'. "
+            "IMPORTANT: This is a full override — always call get_preference_categories first "
+            "to fetch the current tree, modify the target category inside it, then pass the "
+            "complete modified tree here. Omitting a root category will delete it."
         ),
+    )
+    commit: bool = Field(
+        default=False,
+        description="If True, changes go live immediately. If False (default), saves as a draft.",
+    )
+    commit_message: str = Field(
+        default="",
+        description="Description of the changes. Required when commit=True.",
     )
     workspace: str = Field(
         default="",
@@ -84,14 +79,18 @@ class UpdatePreferenceCategoryInput(BaseModel):
 
 
 class UpdatePreferenceCategoryTool(ManagementTool):
-    """PATCH {mgmnt_url}/v1/{ws}/preference_category/{category_slug}/"""
+    """POST {mgmnt_url}/v1/{ws}/preference_category/"""
 
     name = "update_preference_category"
     description = (
-        "Update the defaults for a notification preference category. "
-        "You can change the display name, description, default opt-in/out preference, "
-        "and which channels are mandatory (cannot be opted out). "
-        "Only fields provided (non-empty) are included in the update."
+        "Save an updated preference category tree for a workspace. "
+        "This is a FULL OVERRIDE — always call get_preference_categories first to get the "
+        "current tree, modify only the specific category you want to change, then pass the "
+        "complete tree back here. "
+        "Each category supports: category (slug), name, description, "
+        "default_preference ('opt_in' | 'opt_out' | 'cant_unsubscribe'), "
+        "default_mandatory_channels (list), default_opt_in_channels (list), tags (list). "
+        "Set commit=True to deploy immediately, or leave False to save as a draft first."
     )
     args_schema = UpdatePreferenceCategoryInput
     permission_subcategory = "preference_categories"
@@ -103,40 +102,28 @@ class UpdatePreferenceCategoryTool(ManagementTool):
     async def execute(
         self,
         client: AsyncSuprSendClient,
-        category_slug: str = "",
-        name: str = "",
-        description: str = "",
-        default_preference: str = "",
-        default_mandatory_channels: list = [],
+        root_categories: list = [],
+        commit: bool = False,
+        commit_message: str = "",
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
         if not ws:
             return "Error: workspace is required."
-        if not category_slug:
-            return "Error: category_slug is required."
-        payload: dict = {}
-        if name:
-            payload["name"] = name
-        if description:
-            payload["description"] = description
-        if default_preference:
-            if default_preference not in ("opt_in", "opt_out"):
-                return "Error: default_preference must be 'opt_in' or 'opt_out'."
-            payload["default_preference"] = default_preference
-        if default_mandatory_channels:
-            payload["default_mandatory_channels"] = default_mandatory_channels
-        if not payload:
-            return "Error: at least one field to update must be provided."
+        if not root_categories:
+            return "Error: root_categories is required."
+        if commit and not commit_message:
+            return "Error: commit_message is required when commit=True."
         try:
             mgmt, headers = self._mgmnt(client)
             result = await asyncio.to_thread(
                 mgmt.preference_categories.update,
                 ws,
-                category_slug,
-                payload,
+                root_categories,
+                commit=commit,
+                commit_message=commit_message,
                 extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
-            return self._api_error(e, f"updating preference category '{category_slug}' in workspace '{ws}'")
+            return self._api_error(e, f"updating preference categories in workspace '{ws}'")

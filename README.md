@@ -168,37 +168,84 @@ Hit `management-api.suprsend.com`. Require `api_secret` on `ToolContext`. Auth i
 
 `update_user` and `update_object` accept an `operations` list. Each entry is one operation dict:
 
+| Operation | Purpose | Example |
+|-----------|---------|---------|
+| `$set` | Add or overwrite properties | `{"$set": {"name": "Alice", "$timezone": "America/New_York"}}` |
+| `$unset` | Remove an entire channel or property | `{"$unset": ["$sms", "legacy_field"]}` |
+| `$append` | Add a specific channel address | `{"$append": {"$email": "alice@example.com"}}` |
+| `$remove` | Remove a specific channel address | `{"$remove": {"$email": "alice@example.com"}}` |
+| `$set_once` | Set an immutable property | `{"$set_once": {"first_seen": "2025-01-01"}}` |
+| `$increment` | Numeric increment/decrement | `{"$increment": {"login_count": 1}}` |
+
 ```python
 operations = [
-    {"$set": {"name": "Alice", "plan": "enterprise"}},
-    {"$add_email": "alice@example.com"},
-    {"$remove_sms": "+1234567890"},
+    {"$set": {"name": "Alice", "$timezone": "America/New_York"}},
+    {"$append": {"$email": "alice@example.com"}},
+    {"$remove": {"$sms": "+1234567890"}},
     {"$unset": ["legacy_field"]},
 ]
 ```
 
+Channel keys for `$append` / `$remove` / `$unset`: `$email`, `$sms`, `$whatsapp`, `$androidpush`, `$iospush`, `$slack`, `$webpush`, `$ms_teams`
+
 ### Upsert payload (create_user / create_object)
 
-Pass channel addresses and custom properties directly:
+Pass channel addresses and custom properties directly as a flat dict:
 
 ```python
 properties = {
-    "$name": "Alice",
-    "$email": "alice@example.com",
-    "$sms": "+1234567890",
+    "$email": ["alice@example.com"],
+    "$sms": ["+1234567890"],
+    "$slack": [{"email": "alice@example.com", "access_token": "xoxb-..."}],
+    "$timezone": "America/New_York",
     "custom_prop": "value",
+}
+```
+
+### Upsert tenant
+
+`tenant_name` is required. Other fields are optional:
+
+```python
+payload = {
+    "tenant_name": "Acme Corp",          # required
+    "logo": "https://...",
+    "primary_color": "#aabbcc",
+    "preference_page_url": "https://...",
+    "social_links": {"website": "https://acme.com", "x": "https://x.com/acme"},
+    "properties": {"plan": "enterprise"},
 }
 ```
 
 ### Object subscriptions
 
-`add_object_subscription` recipients can be user distinct_id strings or object reference dicts:
+`add_object_subscription` recipients can be user distinct_id strings or object reference dicts. Max 100 per call.
 
 ```python
 recipients = [
     "user_distinct_id",
     {"object_type": "teams", "id": "team_123"},
 ]
+```
+
+### Update preference categories
+
+`update_preference_category` is a **full override**. Always fetch the current tree with `get_preference_categories` first, modify the target category, then POST the complete tree back. All three root categories (`system`, `transactional`, `promotional`) must be present.
+
+```python
+# Step 1: fetch current tree
+current = toolkit.run_tool("get_preference_categories", {"workspace": "my-ws"})
+
+# Step 2: modify target category in the tree, then:
+root_categories = current["root_categories"]  # modify in place
+
+# Step 3: save
+toolkit.run_tool("update_preference_category", {
+    "root_categories": root_categories,
+    "commit": True,
+    "commit_message": "Update marketing category defaults",
+    "workspace": "my-ws",
+})
 ```
 
 ---

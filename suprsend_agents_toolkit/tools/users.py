@@ -343,10 +343,15 @@ class UpdateUserInput(BaseModel):
     )
     operations: list = Field(
         description=(
-            "List of operation dicts to apply to the user. Each dict is one operation, e.g. "
-            '{"$set": {"name": "Alice"}}, {"$add_email": "alice@example.com"}, '
-            '{"$remove_sms": "+1234567890"}, {"$unset": ["legacy_field"]}. '
-            "Multiple operations can be provided in a single call."
+            "List of operation dicts to apply to the user. Each dict is one operation. "
+            "Supported operations: "
+            '$set — add/update properties e.g. {"$set": {"name": "Alice", "$timezone": "America/New_York"}}; '
+            '$unset — remove properties or entire channels e.g. {"$unset": ["$sms", "old_prop"]}; '
+            '$append — add a channel address e.g. {"$append": {"$email": "alice@example.com"}}; '
+            '$remove — remove a specific channel address e.g. {"$remove": {"$email": "alice@example.com"}}; '
+            '$set_once — set immutable property e.g. {"$set_once": {"first_seen": "2025-01-01"}}; '
+            '$increment — numeric delta e.g. {"$increment": {"login_count": 1}}. '
+            "Multiple operations can be combined in a single call."
         ),
     )
     workspace: str = Field(
@@ -361,9 +366,9 @@ class UpdateUserTool(SuprSendTool):
     name = "update_user"
     description = (
         "Apply partial updates to an existing user profile using operations. "
-        "Use $set to add/overwrite properties, $unset to remove properties, "
-        "$add_email/$add_sms/etc. to add channel addresses, "
-        "$remove_email/$remove_sms/etc. to remove channel addresses. "
+        "Use $set to add/overwrite properties, $unset to remove an entire channel or property, "
+        "$append to add a specific channel address, $remove to remove a specific channel address, "
+        "$set_once to set an immutable property, $increment for numeric counters. "
         "Multiple operations can be combined in one call."
     )
     args_schema = UpdateUserInput

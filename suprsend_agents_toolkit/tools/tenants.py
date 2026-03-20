@@ -132,9 +132,12 @@ class UpsertTenantInput(BaseModel):
     )
     payload: dict = Field(
         description=(
-            "Tenant configuration fields. Supported keys: tenant_name, logo, primary_color, "
-            "secondary_color, tertiary_color, embedded_preference_url, hosted_preference_domain, "
-            "blocked_channels (list), social_links (dict), properties (dict of custom key-values)."
+            "Tenant configuration fields. "
+            "Required: tenant_name (string) — the organization display name. "
+            "Optional: logo (URL string), primary_color (hex), secondary_color (hex), tertiary_color (hex), "
+            "preference_page_url (string), "
+            "social_links (dict — supported keys: website, facebook, LinkedIn, x, instagram, medium, discord, telegram, youtube, tiktok; use empty string to remove a link), "
+            "properties (dict of custom key-value pairs)."
         ),
     )
     workspace: str = Field(
