@@ -53,7 +53,7 @@ class GetTenantTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.tenants.get, tenant_id)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching tenant '{tenant_id}'")
 
@@ -121,7 +121,7 @@ class GetTenantPreferenceTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.tenants.get_all_categories_preference, tenant_id, limit, offset, tags
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching preferences for tenant '{tenant_id}'")
 
@@ -188,6 +188,6 @@ class UpsertTenantTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.tenants.upsert, tenant_id, payload)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"upserting tenant '{tenant_id}'")

@@ -104,4 +104,4 @@ class ValidateSchemaTool(ManagementTool):
             "errors": error,
             "schema": schema,
         }
-        return yaml.dump(summary, default_flow_style=False)
+        return yaml.dump(summary, default_flow_style=False), summary

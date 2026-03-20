@@ -54,7 +54,7 @@ class GetUserTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.users.get, distinct_id)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching user '{distinct_id}'")
 
@@ -163,7 +163,7 @@ class GetUserPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.users.get_full_preference, distinct_id, options or None
                 )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching preferences for user '{distinct_id}'")
 
@@ -220,7 +220,7 @@ class GetUserObjectSubscriptionsTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             options: dict = {"limit": limit}
             result = await asyncio.to_thread(sdk.users.get_objects_subscribed_to, distinct_id, options)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching object subscriptions for user '{distinct_id}'")
 
@@ -276,7 +276,7 @@ class GetUserListSubscriptionsTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             options: dict = {"limit": limit}
             result = await asyncio.to_thread(sdk.users.get_lists_subscribed_to, distinct_id, options)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching list subscriptions for user '{distinct_id}'")
 
@@ -339,7 +339,7 @@ class CreateUserTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.users.upsert, distinct_id, properties)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"creating user '{distinct_id}'")
 
@@ -411,6 +411,6 @@ class UpdateUserTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.users.edit, distinct_id, {"operations": operations})
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"updating user '{distinct_id}'")

@@ -55,7 +55,7 @@ class GetTranslationDetailsTool(ManagementTool):
                 filename,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching translation '{filename}' in workspace '{ws}'")
 
@@ -121,6 +121,6 @@ class UpdateTranslationTool(ManagementTool):
                 content,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"updating translation '{filename}' in workspace '{ws}'")

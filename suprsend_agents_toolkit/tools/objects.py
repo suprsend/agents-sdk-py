@@ -60,7 +60,7 @@ class GetObjectTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.objects.get, object_type, object_id)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching object '{object_type}/{object_id}'")
 
@@ -140,7 +140,7 @@ class GetObjectPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.objects.get_full_preference, object_type, object_id, options or None
                 )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching preferences for object '{object_type}/{object_id}'")
 
@@ -213,7 +213,7 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.objects.get_subscriptions, object_type, object_id, options
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching subscriptions for object '{object_type}/{object_id}'")
 
@@ -283,7 +283,7 @@ class CreateObjectTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.objects.upsert, object_type, object_id, properties)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"creating object '{object_type}/{object_id}'")
 
@@ -361,7 +361,7 @@ class UpdateObjectTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.objects.edit, object_type, object_id, {"operations": operations})
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"updating object '{object_type}/{object_id}'")
 
@@ -440,6 +440,6 @@ class AddObjectSubscriptionTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             payload = {"recipients": recipients, "properties": properties}
             result = await asyncio.to_thread(sdk.objects.create_subscriptions, object_type, object_id, payload)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"adding subscriptions to object '{object_type}/{object_id}'")

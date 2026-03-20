@@ -53,6 +53,6 @@ class GetEventDetailsTool(ManagementTool):
                 event_name,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching event '{event_name}' in workspace '{ws}'")

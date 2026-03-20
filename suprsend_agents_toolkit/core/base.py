@@ -169,7 +169,7 @@ class SuprSendTool(ABC):
     # ── Core logic (subclasses implement) ─────────────────────────────────────
 
     @abstractmethod
-    async def execute(self, client: Any, **kwargs: Any) -> str:
+    async def execute(self, client: Any, **kwargs: Any) -> "str | tuple[str, Any]":
         """
         Tool logic. Resolve workspace / tenant via the helpers:
 
@@ -183,6 +183,9 @@ class SuprSendTool(ABC):
         Management API calls (workflows, events, etc.):
             mgmt, headers = self._mgmnt(client)  # ManagementTool subclasses only
             result = await asyncio.to_thread(mgmt.workflows.get, ws, slug, extra_headers=headers)
+
+        Return a (content_str, artifact) tuple to populate ToolMessage.artifact,
+        or a plain str (artifact will be None).
         """
         ...
 
@@ -198,11 +201,14 @@ class SuprSendTool(ABC):
 
         tool_self = self
 
-        async def _run(run_config: RunnableConfig, **kwargs: Any) -> str:
+        async def _run(run_config: RunnableConfig, **kwargs: Any) -> "tuple[str, Any]":
             client = tool_self._resolve_client(run_config)
             tool_self._enforce_policy(client)
             try:
-                return await tool_self.execute(client=client, **kwargs)
+                result = await tool_self.execute(client=client, **kwargs)
+                if isinstance(result, tuple):
+                    return result
+                return result, None
             finally:
                 # JWT-derived clients own their own aiohttp session; close it
                 # so connections are not leaked across tool calls.
@@ -214,6 +220,7 @@ class SuprSendTool(ABC):
             name=self.name,
             description=self.description,
             args_schema=self.args_schema,
+            response_format="content_and_artifact",
         )
 
     def to_openai(self) -> dict:

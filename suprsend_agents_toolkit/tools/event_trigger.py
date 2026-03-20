@@ -148,6 +148,6 @@ class TrackEventTool(ManagementTool):
             if tenant:
                 summary["tracked"]["tenant_id"] = tenant
             summary["api_response"] = result
-            return yaml.dump(summary, default_flow_style=False)
+            return yaml.dump(summary, default_flow_style=False), summary
         except Exception as e:
             return self._api_error(e, f"tracking event '{event_name}'")

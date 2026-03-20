@@ -96,7 +96,7 @@ class ListWorkflowsTool(ManagementTool):
                 offset=offset,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"listing workflows for workspace '{ws}'")
 
@@ -148,7 +148,7 @@ class GetWorkflowTool(ManagementTool):
                 workflow_slug,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching workflow '{workflow_slug}'")
 
@@ -208,7 +208,7 @@ class PushWorkflowTool(ManagementTool):
                 commit_message=commit_message,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"pushing workflow '{workflow_slug}'")
 
@@ -258,6 +258,6 @@ class CommitWorkflowTool(ManagementTool):
                 commit_message=commit_message,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"committing workflow '{workflow_slug}'")
