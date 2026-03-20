@@ -2,7 +2,9 @@ import asyncio
 
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
@@ -298,6 +300,13 @@ class CreateUserInput(BaseModel):
         description="Workspace slug. Uses configured default if omitted.",
     )
 
+    @field_validator("properties", mode="before")
+    @classmethod
+    def parse_properties(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
 
 class CreateUserTool(SuprSendTool):
     """POST {base_url}/v1/user/{distinct_id}/"""
@@ -358,6 +367,13 @@ class UpdateUserInput(BaseModel):
         default="",
         description="Workspace slug. Uses configured default if omitted.",
     )
+
+    @field_validator("operations", mode="before")
+    @classmethod
+    def parse_operations(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
 
 class UpdateUserTool(SuprSendTool):

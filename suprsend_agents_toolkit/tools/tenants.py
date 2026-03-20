@@ -1,7 +1,9 @@
 import asyncio
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
@@ -135,15 +137,24 @@ class UpsertTenantInput(BaseModel):
             "Tenant configuration fields. "
             "Required: tenant_name (string) — the organization display name. "
             "Optional: logo (URL string), primary_color (hex), secondary_color (hex), tertiary_color (hex), "
-            "preference_page_url (string), "
-            "social_links (dict — supported keys: website, facebook, LinkedIn, x, instagram, medium, discord, telegram, youtube, tiktok; use empty string to remove a link), "
-            "properties (dict of custom key-value pairs)."
+            "timezone (IANA timezone string — fallback timezone for recipients), "
+            "blocked_channels (list of channel names to skip, e.g. [\"email\", \"sms\"]), "
+            "embedded_preference_url (string — in-product notification center link), "
+            "social_links (dict — supported keys: website, facebook, linkedin, x, instagram, medium, discord, telegram, youtube, tiktok; use empty string to remove a link), "
+            "properties (dict of custom key-value pairs, accessible in templates as {{$brand.prop}})."
         ),
     )
     workspace: str = Field(
         default="",
         description="Workspace slug. Uses configured default if omitted.",
     )
+
+    @field_validator("payload", mode="before")
+    @classmethod
+    def parse_payload(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
 
 class UpsertTenantTool(SuprSendTool):

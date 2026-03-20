@@ -208,10 +208,12 @@ properties = {
 
 ```python
 payload = {
-    "tenant_name": "Acme Corp",          # required
+    "tenant_name": "Acme Corp",               # required
     "logo": "https://...",
     "primary_color": "#aabbcc",
-    "preference_page_url": "https://...",
+    "timezone": "America/New_York",
+    "blocked_channels": ["sms"],
+    "embedded_preference_url": "https://...",
     "social_links": {"website": "https://acme.com", "x": "https://x.com/acme"},
     "properties": {"plan": "enterprise"},
 }

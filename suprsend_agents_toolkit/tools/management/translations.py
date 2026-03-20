@@ -1,7 +1,9 @@
 import asyncio
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
@@ -71,6 +73,13 @@ class UpdateTranslationInput(BaseModel):
         default="",
         description="Workspace slug. Uses configured default if omitted.",
     )
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def parse_content(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
 
 class UpdateTranslationTool(ManagementTool):
