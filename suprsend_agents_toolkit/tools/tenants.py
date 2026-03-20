@@ -122,3 +122,58 @@ class GetTenantPreferenceTool(SuprSendTool):
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return self._api_error(e, f"fetching preferences for tenant '{tenant_id}'")
+
+
+# ── UpsertTenantTool ──────────────────────────────────────────────────────────
+
+class UpsertTenantInput(BaseModel):
+    tenant_id: str = Field(
+        description="Unique identifier of the tenant to create or update."
+    )
+    payload: dict = Field(
+        description=(
+            "Tenant configuration fields. Supported keys: tenant_name, logo, primary_color, "
+            "secondary_color, tertiary_color, embedded_preference_url, hosted_preference_domain, "
+            "blocked_channels (list), social_links (dict), properties (dict of custom key-values)."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class UpsertTenantTool(SuprSendTool):
+    """POST {base_url}/v1/tenant/{tenant_id}/"""
+
+    name = "upsert_tenant"
+    description = (
+        "Create or update a tenant. A tenant represents a customer organization and controls "
+        "branding (logo, colors), preference page URLs, blocked channels, social links, and "
+        "custom properties. If the tenant already exists it is updated with the provided fields."
+    )
+    args_schema = UpsertTenantInput
+    permission_category = "tenants"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        tenant_id: str = "",
+        payload: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not tenant_id:
+            return "Error: tenant_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.tenants.upsert, tenant_id, payload)
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"upserting tenant '{tenant_id}'")

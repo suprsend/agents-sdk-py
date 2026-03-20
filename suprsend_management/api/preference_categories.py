@@ -15,6 +15,9 @@ class PreferenceCategoriesApi(BaseApi):
     def _url(self, workspace: str) -> str:
         return f"{self.config.base_url}/v1/{quote(workspace, safe='')}/preference_category/"
 
+    def _detail_url(self, workspace: str, category_slug: str) -> str:
+        return f"{self.config.base_url}/v1/{quote(workspace, safe='')}/preference_category/{quote(category_slug, safe='')}/"
+
     def list(self, workspace: str, extra_headers: dict | None = None) -> dict:
         """
         List all notification/preference categories for a workspace.
@@ -30,6 +33,19 @@ class PreferenceCategoriesApi(BaseApi):
             SuprsendManagementException: on 4xx / 5xx responses.
         """
         resp = requests.get(self._url(workspace), headers=self._headers(extra_headers), timeout=_DEFAULT_TIMEOUT)
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def update(self, workspace: str, category_slug: str, payload: dict,
+               extra_headers: dict | None = None) -> dict:
+        """PATCH /v1/{workspace}/preference_category/{category_slug}/ — update category defaults."""
+        resp = requests.patch(
+            self._detail_url(workspace, category_slug),
+            json=payload,
+            headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
+        )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
         return resp.json()

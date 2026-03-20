@@ -277,3 +277,119 @@ class GetUserListSubscriptionsTool(SuprSendTool):
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return self._api_error(e, f"fetching list subscriptions for user '{distinct_id}'")
+
+
+# ── CreateUserTool ────────────────────────────────────────────────────────────
+
+class CreateUserInput(BaseModel):
+    distinct_id: str = Field(
+        description="Unique identifier of the user to create or update."
+    )
+    properties: dict = Field(
+        default={},
+        description=(
+            "User properties to set. Supports system properties like $name, $email, $sms, "
+            "$whatsapp, $androidpush, $iospush, $webpush, $slack, $ms_teams, $inbox, "
+            "$timezone, $locale — and any custom key-value properties."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CreateUserTool(SuprSendTool):
+    """POST {base_url}/v1/user/{distinct_id}/"""
+
+    name = "create_user"
+    description = (
+        "Create or fully replace a user profile. Provide the user's distinct_id and a properties "
+        "dict containing channel addresses ($email, $sms, $whatsapp, etc.) and any custom fields. "
+        "This is an upsert — if the user already exists their profile is replaced with the given properties."
+    )
+    args_schema = CreateUserInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        distinct_id: str = "",
+        properties: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not distinct_id:
+            return "Error: distinct_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.users.upsert, distinct_id, properties)
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"creating user '{distinct_id}'")
+
+
+# ── UpdateUserTool ────────────────────────────────────────────────────────────
+
+class UpdateUserInput(BaseModel):
+    distinct_id: str = Field(
+        description="Unique identifier of the user to update."
+    )
+    operations: list = Field(
+        description=(
+            "List of operation dicts to apply to the user. Each dict is one operation, e.g. "
+            '{"$set": {"name": "Alice"}}, {"$add_email": "alice@example.com"}, '
+            '{"$remove_sms": "+1234567890"}, {"$unset": ["legacy_field"]}. '
+            "Multiple operations can be provided in a single call."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class UpdateUserTool(SuprSendTool):
+    """PATCH {base_url}/v1/user/{distinct_id}/"""
+
+    name = "update_user"
+    description = (
+        "Apply partial updates to an existing user profile using operations. "
+        "Use $set to add/overwrite properties, $unset to remove properties, "
+        "$add_email/$add_sms/etc. to add channel addresses, "
+        "$remove_email/$remove_sms/etc. to remove channel addresses. "
+        "Multiple operations can be combined in one call."
+    )
+    args_schema = UpdateUserInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        distinct_id: str = "",
+        operations: list = [],
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not distinct_id:
+            return "Error: distinct_id is required."
+        if not operations:
+            return "Error: operations list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.users.edit, distinct_id, {"operations": operations})
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"updating user '{distinct_id}'")

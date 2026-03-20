@@ -214,3 +214,204 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return self._api_error(e, f"fetching subscriptions for object '{object_type}/{object_id}'")
+
+
+# ── CreateObjectTool ──────────────────────────────────────────────────────────
+
+class CreateObjectInput(BaseModel):
+    object_type: str = Field(
+        description="Type of the object. Should be a plural namespace (e.g. 'departments', 'teams')."
+    )
+    object_id: str = Field(
+        description="Unique identifier of the object within the given object_type."
+    )
+    properties: dict = Field(
+        default={},
+        description=(
+            "Object properties to set. Supports system properties like $name, $email, $sms, "
+            "$whatsapp, $androidpush, $iospush, $webpush, $slack, $ms_teams, $inbox — "
+            "and any custom key-value properties."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CreateObjectTool(SuprSendTool):
+    """POST {base_url}/v1/object/{object_type}/{object_id}/"""
+
+    name = "create_object"
+    description = (
+        "Create or fully replace an object profile. Objects represent entities in your system "
+        "(teams, departments, organizations) that can receive notifications and have subscribers. "
+        "Provide object_type, object_id, and a properties dict. "
+        "This is an upsert — if the object already exists its profile is replaced."
+    )
+    args_schema = CreateObjectInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        properties: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.objects.upsert, object_type, object_id, properties)
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"creating object '{object_type}/{object_id}'")
+
+
+# ── UpdateObjectTool ──────────────────────────────────────────────────────────
+
+class UpdateObjectInput(BaseModel):
+    object_type: str = Field(
+        description="Type of the object. Should be a plural namespace (e.g. 'departments', 'teams')."
+    )
+    object_id: str = Field(
+        description="Unique identifier of the object within the given object_type."
+    )
+    operations: list = Field(
+        description=(
+            "List of operation dicts to apply to the object. Each dict is one operation, e.g. "
+            '{"$set": {"name": "Team Alpha", "region": "US"}}, '
+            '{"$add_email": "team@example.com"}, {"$unset": ["legacy_field"]}. '
+            "Multiple operations can be provided in a single call."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class UpdateObjectTool(SuprSendTool):
+    """PATCH {base_url}/v1/object/{object_type}/{object_id}/"""
+
+    name = "update_object"
+    description = (
+        "Apply partial updates to an existing object using operations. "
+        "Use $set to add/overwrite properties, $unset to remove properties, "
+        "$add_email/$add_sms/etc. to add channel addresses, "
+        "$remove_email/$remove_sms/etc. to remove channel addresses. "
+        "Multiple operations can be combined in one call."
+    )
+    args_schema = UpdateObjectInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        operations: list = [],
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not operations:
+            return "Error: operations list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.objects.edit, object_type, object_id, {"operations": operations})
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"updating object '{object_type}/{object_id}'")
+
+
+# ── AddObjectSubscriptionTool ─────────────────────────────────────────────────
+
+class AddObjectSubscriptionInput(BaseModel):
+    object_type: str = Field(
+        description="Type of the parent object. Should be a plural namespace (e.g. 'departments', 'teams')."
+    )
+    object_id: str = Field(
+        description="Unique identifier of the parent object."
+    )
+    recipients: list = Field(
+        description=(
+            "List of recipients to subscribe. Each entry is either a user's distinct_id string, "
+            'or an object reference dict like {"object_type": "teams", "id": "team_123"}.'
+        ),
+    )
+    properties: dict = Field(
+        default={},
+        description=(
+            "Subscription-level properties shared across all recipients in this call. "
+            "Accessible in workflow templates as $recipient.subscription.<key>."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class AddObjectSubscriptionTool(SuprSendTool):
+    """POST {base_url}/v1/object/{object_type}/{object_id}/subscription/"""
+
+    name = "add_object_subscription"
+    description = (
+        "Add one or more subscribers (users or child objects) to an object. "
+        "Recipients can be user distinct_id strings or object reference dicts. "
+        "Optional subscription-level properties are accessible in notification templates "
+        "as $recipient.subscription.<key>."
+    )
+    args_schema = AddObjectSubscriptionInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        recipients: list = [],
+        properties: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not recipients:
+            return "Error: recipients list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            payload = {"recipients": recipients, "properties": properties}
+            result = await asyncio.to_thread(sdk.objects.create_subscriptions, object_type, object_id, payload)
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"adding subscriptions to object '{object_type}/{object_id}'")

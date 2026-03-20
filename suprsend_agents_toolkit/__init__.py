@@ -11,10 +11,29 @@ from suprsend_agents_toolkit.tools.users import (
     GetUserPreferenceTool,
     GetUserObjectSubscriptionsTool,
     GetUserListSubscriptionsTool,
+    CreateUserTool,
+    UpdateUserTool,
 )
-from suprsend_agents_toolkit.tools.objects import GetObjectTool, GetObjectPreferenceTool, GetObjectSubscriptionsTool
-from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool
-from suprsend_agents_toolkit.tools.management import GetPreferenceCategoriesTool, ListWorkflowsTool, GetWorkflowTool, PushWorkflowTool, CommitWorkflowTool, GetEventDetailsTool, GetTranslationDetailsTool
+from suprsend_agents_toolkit.tools.objects import (
+    GetObjectTool,
+    GetObjectPreferenceTool,
+    GetObjectSubscriptionsTool,
+    CreateObjectTool,
+    UpdateObjectTool,
+    AddObjectSubscriptionTool,
+)
+from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool, UpsertTenantTool
+from suprsend_agents_toolkit.tools.management import (
+    GetPreferenceCategoriesTool,
+    UpdatePreferenceCategoryTool,
+    ListWorkflowsTool,
+    GetWorkflowTool,
+    PushWorkflowTool,
+    CommitWorkflowTool,
+    GetEventDetailsTool,
+    GetTranslationDetailsTool,
+    UpdateTranslationTool,
+)
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
 from suprsend_agents_toolkit.tools.validate_schema import ValidateSchemaTool
@@ -36,21 +55,29 @@ _ALL_TOOLS: dict[str, type] = {
     "get_user_preference": GetUserPreferenceTool,
     "get_user_object_subscriptions": GetUserObjectSubscriptionsTool,
     "get_user_list_subscriptions": GetUserListSubscriptionsTool,
+    "create_user": CreateUserTool,
+    "update_user": UpdateUserTool,
     # objects
     "get_object": GetObjectTool,
     "get_object_preference": GetObjectPreferenceTool,
     "get_object_subscriptions": GetObjectSubscriptionsTool,
+    "create_object": CreateObjectTool,
+    "update_object": UpdateObjectTool,
+    "add_object_subscription": AddObjectSubscriptionTool,
     # tenants
     "get_tenant": GetTenantTool,
     "get_tenant_preference": GetTenantPreferenceTool,
+    "upsert_tenant": UpsertTenantTool,
     # management
     "get_preference_categories": GetPreferenceCategoriesTool,
+    "update_preference_category": UpdatePreferenceCategoryTool,
     "list_workflows": ListWorkflowsTool,
     "get_workflow": GetWorkflowTool,
     "push_workflow": PushWorkflowTool,
     "commit_workflow": CommitWorkflowTool,
     "get_event_details": GetEventDetailsTool,
     "get_translation_details": GetTranslationDetailsTool,
+    "update_translation": UpdateTranslationTool,
     # workflows (trigger)
     "trigger_workflow": TriggerWorkflowTool,
     # events

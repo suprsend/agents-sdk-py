@@ -56,3 +56,62 @@ class GetTranslationDetailsTool(ManagementTool):
             return yaml.dump(result, default_flow_style=False)
         except Exception as e:
             return self._api_error(e, f"fetching translation '{filename}' in workspace '{ws}'")
+
+
+# ── UpdateTranslationTool ─────────────────────────────────────────────────────
+
+class UpdateTranslationInput(BaseModel):
+    filename: str = Field(
+        description="The translation filename to create or update (e.g. 'en_common.json').",
+    )
+    content: dict = Field(
+        description="Translation key-value pairs to store (e.g. {'greeting': 'Hello', 'farewell': 'Goodbye'}).",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class UpdateTranslationTool(ManagementTool):
+    """POST {mgmnt_url}/v1/{ws}/translation/content/{filename}/"""
+
+    name = "update_translation"
+    description = (
+        "Create or update a translation file for a workspace. "
+        "Provide the filename (e.g. 'en_common.json') and a dict of translation key-value pairs. "
+        "Use this to add or overwrite localized strings used in notification templates."
+    )
+    args_schema = UpdateTranslationInput
+    permission_subcategory = "translations"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        filename: str = "",
+        content: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not filename:
+            return "Error: filename is required."
+        if not content:
+            return "Error: content is required."
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.translations.upsert,
+                ws,
+                filename,
+                content,
+                extra_headers=headers,
+            )
+            return yaml.dump(result, default_flow_style=False)
+        except Exception as e:
+            return self._api_error(e, f"updating translation '{filename}' in workspace '{ws}'")

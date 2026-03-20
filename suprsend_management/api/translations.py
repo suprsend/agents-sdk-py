@@ -32,3 +32,16 @@ class TranslationsApi(BaseApi):
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
         return resp.json()
+
+    def upsert(self, workspace: str, filename: str, content: dict,
+               extra_headers: dict | None = None) -> dict:
+        """POST /v1/{workspace}/translation/content/{filename}/ — create or update a translation file."""
+        resp = requests.post(
+            self._url(workspace, filename),
+            json={"content": content},
+            headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
