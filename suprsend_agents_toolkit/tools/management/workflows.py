@@ -158,8 +158,6 @@ class GetWorkflowTool(ManagementTool):
 class PushWorkflowInput(BaseModel):
     workflow_slug: str = Field(description="Slug of the workflow to create or update.")
     workflow: dict = Field(description="Full workflow definition as a dict (same shape as get_workflow response).")
-    commit: bool = Field(default=False, description="False = save as draft (default). True = validate and deploy immediately.")
-    commit_message: str = Field(default="", description="Optional message describing the changes.")
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
 
 
@@ -168,11 +166,11 @@ class PushWorkflowTool(ManagementTool):
 
     name = "push_workflow"
     description = (
-        "Create or update a workflow definition. Accepts the full workflow dict "
+        "Create or update a workflow definition as a draft. Accepts the full workflow dict "
         "(same shape returned by get_workflow). "
         "Automatically validates the definition before saving — returns validation errors "
         "without writing to the database if the definition is invalid. "
-        "Use commit=False (default) to save as draft; use commit=True to deploy immediately."
+        "Always saves as draft. Use commit_workflow to deploy to live."
     )
     args_schema = PushWorkflowInput
     permission_subcategory = "workflows"
@@ -186,8 +184,6 @@ class PushWorkflowTool(ManagementTool):
         client: AsyncSuprSendClient,
         workflow_slug: str = "",
         workflow: dict = None,
-        commit: bool = False,
-        commit_message: str = "",
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -216,8 +212,7 @@ class PushWorkflowTool(ManagementTool):
                 ws,
                 workflow_slug,
                 workflow,
-                commit=commit,
-                commit_message=commit_message,
+                commit=False,
                 extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False), result
