@@ -1,7 +1,6 @@
 import asyncio
-import yaml
-
 import json
+import yaml
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -155,6 +154,67 @@ class GetWorkflowTool(ManagementTool):
             return self._api_error(e, f"fetching workflow '{workflow_slug}'")
 
 
+# ── ValidateWorkflowTool ──────────────────────────────────────────────────────
+
+class ValidateWorkflowInput(BaseModel):
+    workflow_slug: str = Field(description="Slug of the workflow to validate.")
+    workflow: dict = Field(description="Full workflow definition as a dict (same shape as get_workflow response).")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("workflow", mode="before")
+    @classmethod
+    def parse_workflow(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class ValidateWorkflowTool(ManagementTool):
+    """POST {mgmnt_url}/v1/{ws}/workflow/{workflow_slug}/validate/"""
+
+    name = "validate_workflow"
+    description = (
+        "Validate a workflow definition without saving it. "
+        "Returns {\"is_valid\": true} if the definition is valid, or "
+        "{\"is_valid\": false, \"errors\": [...]} with details if it is not. "
+        "Use this to check a workflow before returning it to the main agent. "
+        "Does NOT write to the database."
+    )
+    args_schema = ValidateWorkflowInput
+    permission_subcategory = "workflows"
+    permission_operation = "read"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        workflow_slug: str = "",
+        workflow: dict = None,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not workflow_slug:
+            return "Error: workflow_slug is required.", {}
+        if not workflow:
+            return "Error: workflow definition is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.validate,
+                ws,
+                workflow_slug,
+                workflow,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"validating workflow '{workflow_slug}'")
+
+
 # ── PushWorkflowTool ──────────────────────────────────────────────────────────
 
 class PushWorkflowInput(BaseModel):
@@ -175,11 +235,9 @@ class PushWorkflowTool(ManagementTool):
 
     name = "push_workflow"
     description = (
-        "Create or update a workflow definition as a draft. Accepts the full workflow dict "
-        "(same shape returned by get_workflow). "
-        "Automatically validates the definition before saving — returns validation errors "
-        "without writing to the database if the definition is invalid. "
-        "Always saves as draft. Use commit_workflow to deploy to live."
+        "Save a workflow definition as a draft (does not deploy). "
+        "Accepts the full workflow dict (same shape returned by get_workflow). "
+        "Always saves as draft — use commit_workflow to deploy to live."
     )
     args_schema = PushWorkflowInput
     permission_subcategory = "workflows"
@@ -194,28 +252,16 @@ class PushWorkflowTool(ManagementTool):
         workflow_slug: str = "",
         workflow: dict = None,
         **kwargs,
-    ) -> str:
+    ) -> tuple[str, dict]:
         ws = self._workspace(client, kwargs)
         if not ws:
-            return "Error: workspace is required."
+            return "Error: workspace is required.", {}
         if not workflow_slug:
-            return "Error: workflow_slug is required."
+            return "Error: workflow_slug is required.", {}
         if not workflow:
-            return "Error: workflow definition is required."
+            return "Error: workflow definition is required.", {}
         try:
             mgmt, headers = self._mgmnt(client)
-            # Validate before saving — does not write to the database
-            validation = await asyncio.to_thread(
-                mgmt.workflows.validate,
-                ws,
-                workflow_slug,
-                workflow,
-                extra_headers=headers,
-            )
-            if not validation.get("is_valid", True):
-                errors = validation.get("errors", [])
-                result = {"validation_failed": True, "errors": errors}
-                return yaml.dump(result, default_flow_style=False), result
             result = await asyncio.to_thread(
                 mgmt.workflows.push,
                 ws,
@@ -224,7 +270,7 @@ class PushWorkflowTool(ManagementTool):
                 commit=False,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False), result
+            return json.dumps(result), result
         except Exception as e:
             return self._api_error(e, f"pushing workflow '{workflow_slug}'")
 
@@ -274,6 +320,6 @@ class CommitWorkflowTool(ManagementTool):
                 commit_message=commit_message,
                 extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False), result
+            return json.dumps(result), result
         except Exception as e:
             return self._api_error(e, f"committing workflow '{workflow_slug}'")
