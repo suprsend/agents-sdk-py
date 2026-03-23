@@ -3,7 +3,9 @@ import uuid
 from typing import Union
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
@@ -46,6 +48,23 @@ class TriggerWorkflowInput(BaseModel):
         default="",
         description="Workspace slug. Uses configured default if omitted.",
     )
+
+    @field_validator("recipients", mode="before")
+    @classmethod
+    def parse_recipients(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def parse_data(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return v  # keep as string — may be a Jsonnet template
+        return v
 
 
 class TriggerWorkflowTool(ManagementTool):

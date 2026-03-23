@@ -1,7 +1,9 @@
 import asyncio
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
@@ -159,6 +161,13 @@ class PushWorkflowInput(BaseModel):
     workflow_slug: str = Field(description="Slug of the workflow to create or update.")
     workflow: dict = Field(description="Full workflow definition as a dict (same shape as get_workflow response).")
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("workflow", mode="before")
+    @classmethod
+    def parse_workflow(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
 
 class PushWorkflowTool(ManagementTool):
