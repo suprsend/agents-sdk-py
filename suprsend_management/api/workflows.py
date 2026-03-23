@@ -102,6 +102,39 @@ class WorkflowsApi(BaseApi):
             raise SuprsendManagementException(resp)
         return resp.json()
 
+    def validate(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        workflow: dict,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        POST /v1/{ws}/workflow/{slug}/validate/
+        Validates the workflow definition without saving to the database.
+
+        Args:
+            workspace:      Workspace slug.
+            workflow_slug:  The workflow identifier.
+            workflow:       Full workflow definition dict.
+            extra_headers:  Additional headers merged into the request.
+
+        Returns:
+            Validation result object — {"is_valid": bool, "errors": [...]}.
+
+        Raises:
+            SuprsendManagementException: on 4xx / 5xx responses.
+        """
+        resp = requests.post(
+            self._url(workspace, workflow_slug) + "validate/",
+            headers=self._headers(extra_headers),
+            json=workflow,
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
     def push(
         self,
         workspace: str,

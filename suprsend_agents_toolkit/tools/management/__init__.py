@@ -2,6 +2,7 @@ from suprsend_agents_toolkit.tools.management.preference_categories import GetPr
 from suprsend_agents_toolkit.tools.management.workflows import ListWorkflowsTool, GetWorkflowTool, PushWorkflowTool, CommitWorkflowTool
 from suprsend_agents_toolkit.tools.management.events import GetEventDetailsTool
 from suprsend_agents_toolkit.tools.management.translations import GetTranslationDetailsTool, UpdateTranslationTool
+from suprsend_agents_toolkit.tools.management.schemas import ListSchemasTool, GetSchemaTool, PushSchemaTool, CommitSchemaTool, LinkEventSchemaTool
 
 __all__ = [
     "GetPreferenceCategoriesTool",
@@ -13,4 +14,9 @@ __all__ = [
     "GetEventDetailsTool",
     "GetTranslationDetailsTool",
     "UpdateTranslationTool",
+    "ListSchemasTool",
+    "GetSchemaTool",
+    "PushSchemaTool",
+    "CommitSchemaTool",
+    "LinkEventSchemaTool",
 ]

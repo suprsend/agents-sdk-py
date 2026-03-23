@@ -170,9 +170,9 @@ class PushWorkflowTool(ManagementTool):
     description = (
         "Create or update a workflow definition. Accepts the full workflow dict "
         "(same shape returned by get_workflow). "
-        "Use commit=False (default) to save as draft for validation; "
-        "use commit=True to deploy immediately. "
-        "Always use commit=False first to validate the workflow structure."
+        "Automatically validates the definition before saving — returns validation errors "
+        "without writing to the database if the definition is invalid. "
+        "Use commit=False (default) to save as draft; use commit=True to deploy immediately."
     )
     args_schema = PushWorkflowInput
     permission_subcategory = "workflows"
@@ -199,6 +199,18 @@ class PushWorkflowTool(ManagementTool):
             return "Error: workflow definition is required."
         try:
             mgmt, headers = self._mgmnt(client)
+            # Validate before saving — does not write to the database
+            validation = await asyncio.to_thread(
+                mgmt.workflows.validate,
+                ws,
+                workflow_slug,
+                workflow,
+                extra_headers=headers,
+            )
+            if not validation.get("is_valid", True):
+                errors = validation.get("errors", [])
+                result = {"validation_failed": True, "errors": errors}
+                return yaml.dump(result, default_flow_style=False), result
             result = await asyncio.to_thread(
                 mgmt.workflows.push,
                 ws,

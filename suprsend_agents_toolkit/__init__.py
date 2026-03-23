@@ -13,6 +13,8 @@ from suprsend_agents_toolkit.tools.users import (
     GetUserListSubscriptionsTool,
     CreateUserTool,
     UpdateUserTool,
+    UpdateUserPreferenceCategoryTool,
+    UpdateUserPreferenceChannelTool,
 )
 from suprsend_agents_toolkit.tools.objects import (
     GetObjectTool,
@@ -21,8 +23,15 @@ from suprsend_agents_toolkit.tools.objects import (
     CreateObjectTool,
     UpdateObjectTool,
     AddObjectSubscriptionTool,
+    UpdateObjectPreferenceCategoryTool,
+    UpdateObjectPreferenceChannelTool,
 )
-from suprsend_agents_toolkit.tools.tenants import GetTenantTool, GetTenantPreferenceTool, UpsertTenantTool
+from suprsend_agents_toolkit.tools.tenants import (
+    GetTenantTool,
+    GetTenantPreferenceTool,
+    UpsertTenantTool,
+    UpdateTenantPreferenceCategoryTool,
+)
 from suprsend_agents_toolkit.tools.management import (
     GetPreferenceCategoriesTool,
     UpdatePreferenceCategoryTool,
@@ -33,6 +42,11 @@ from suprsend_agents_toolkit.tools.management import (
     GetEventDetailsTool,
     GetTranslationDetailsTool,
     UpdateTranslationTool,
+    ListSchemasTool,
+    GetSchemaTool,
+    PushSchemaTool,
+    CommitSchemaTool,
+    LinkEventSchemaTool,
 )
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
@@ -57,6 +71,8 @@ _ALL_TOOLS: dict[str, type] = {
     "get_user_list_subscriptions": GetUserListSubscriptionsTool,
     "create_user": CreateUserTool,
     "update_user": UpdateUserTool,
+    "update_user_preference_category": UpdateUserPreferenceCategoryTool,
+    "update_user_preference_channel": UpdateUserPreferenceChannelTool,
     # objects
     "get_object": GetObjectTool,
     "get_object_preference": GetObjectPreferenceTool,
@@ -64,10 +80,13 @@ _ALL_TOOLS: dict[str, type] = {
     "create_object": CreateObjectTool,
     "update_object": UpdateObjectTool,
     "add_object_subscription": AddObjectSubscriptionTool,
+    "update_object_preference_category": UpdateObjectPreferenceCategoryTool,
+    "update_object_preference_channel": UpdateObjectPreferenceChannelTool,
     # tenants
     "get_tenant": GetTenantTool,
     "get_tenant_preference": GetTenantPreferenceTool,
     "upsert_tenant": UpsertTenantTool,
+    "update_tenant_preference_category": UpdateTenantPreferenceCategoryTool,
     # management
     "get_preference_categories": GetPreferenceCategoriesTool,
     "update_preference_category": UpdatePreferenceCategoryTool,
@@ -78,6 +97,11 @@ _ALL_TOOLS: dict[str, type] = {
     "get_event_details": GetEventDetailsTool,
     "get_translation_details": GetTranslationDetailsTool,
     "update_translation": UpdateTranslationTool,
+    "list_schemas": ListSchemasTool,
+    "get_schema": GetSchemaTool,
+    "push_schema": PushSchemaTool,
+    "commit_schema": CommitSchemaTool,
+    "link_event_schema": LinkEventSchemaTool,
     # workflows (trigger)
     "trigger_workflow": TriggerWorkflowTool,
     # events

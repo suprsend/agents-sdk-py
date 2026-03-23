@@ -443,3 +443,162 @@ class AddObjectSubscriptionTool(SuprSendTool):
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"adding subscriptions to object '{object_type}/{object_id}'")
+
+
+# ── UpdateObjectPreferenceCategoryTool ────────────────────────────────────────
+
+_VALID_CHANNELS_OBJ = ["email", "sms", "whatsapp", "androidpush", "iospush", "webpush", "inbox", "slack", "ms_teams"]
+_CHANNELS_DESC_OBJ = ", ".join(f'"{c}"' for c in _VALID_CHANNELS_OBJ)
+
+
+class UpdateObjectPreferenceCategoryInput(BaseModel):
+    object_type: str = Field(description="Type/namespace of the object.")
+    object_id: str = Field(description="Unique identifier of the object within its type.")
+    category: str = Field(description="Preference category slug to update.")
+    preference: str = Field(
+        description='Opt-in/out decision for the category. Must be "opt_in" or "opt_out".',
+    )
+    opt_in_channels: list = Field(
+        default_factory=list,
+        description=f"Channels to opt into for this category. Valid values: {_CHANNELS_DESC_OBJ}.",
+    )
+    opt_out_channels: list = Field(
+        default_factory=list,
+        description=f"Channels to opt out of for this category. Valid values: {_CHANNELS_DESC_OBJ}.",
+    )
+    tenant_id: str = Field(
+        default="",
+        description="Tenant scope for the preference update. Omit for the global (default) tenant.",
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("opt_in_channels", "opt_out_channels", mode="before")
+    @classmethod
+    def parse_channels(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateObjectPreferenceCategoryTool(SuprSendTool):
+    """PATCH {base_url}/v1/object/{object_type}/{object_id}/preference/category/{category}/"""
+
+    name = "update_object_preference_category"
+    description = (
+        "Update an object's opt-in or opt-out preference for a specific notification category. "
+        "Set preference to 'opt_in' or 'opt_out' for the category as a whole. "
+        "Optionally restrict to specific channels via opt_in_channels or opt_out_channels. "
+        "Scope to a tenant with tenant_id for tenant-level preferences."
+    )
+    args_schema = UpdateObjectPreferenceCategoryInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        category: str = "",
+        preference: str = "",
+        opt_in_channels: list = [],
+        opt_out_channels: list = [],
+        tenant_id: str = "",
+        **kwargs,
+    ):
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not category:
+            return "Error: category is required."
+        if preference not in ("opt_in", "opt_out"):
+            return "Error: preference must be 'opt_in' or 'opt_out'."
+        payload: dict = {"preference": preference}
+        if opt_in_channels:
+            payload["opt_in_channels"] = opt_in_channels
+        if opt_out_channels:
+            payload["opt_out_channels"] = opt_out_channels
+        options = {"tenant_id": tenant_id} if tenant_id else None
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.objects.update_category_preference, object_type, object_id, category, payload, options
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating category preference for object '{object_type}/{object_id}'")
+
+
+# ── UpdateObjectPreferenceChannelTool ─────────────────────────────────────────
+
+class UpdateObjectPreferenceChannelInput(BaseModel):
+    object_type: str = Field(description="Type/namespace of the object.")
+    object_id: str = Field(description="Unique identifier of the object within its type.")
+    channel_preferences: list = Field(
+        description=(
+            f"List of channel preference objects. Each item must have: "
+            f'"channel" (one of {_CHANNELS_DESC_OBJ}) and '
+            f'"is_restricted" (bool — true blocks the channel, false enables it).'
+        ),
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("channel_preferences", mode="before")
+    @classmethod
+    def parse_channel_preferences(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateObjectPreferenceChannelTool(SuprSendTool):
+    """PATCH {base_url}/v1/object/{object_type}/{object_id}/preference/channel_preference/"""
+
+    name = "update_object_preference_channel"
+    description = (
+        "Update an object's overall channel-level notification preferences. "
+        "Set is_restricted=true to block a channel entirely for the object, false to enable it. "
+        "Multiple channels can be updated in a single call."
+    )
+    args_schema = UpdateObjectPreferenceChannelInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        channel_preferences: list = [],
+        **kwargs,
+    ):
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not channel_preferences:
+            return "Error: channel_preferences list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.objects.update_channel_preference,
+                object_type,
+                object_id,
+                {"channel_preferences": channel_preferences},
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating channel preferences for object '{object_type}/{object_id}'")
