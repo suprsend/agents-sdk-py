@@ -292,7 +292,9 @@ class CreateUserInput(BaseModel):
         description=(
             "User properties to set. Supports system properties like $name, $email, $sms, "
             "$whatsapp, $androidpush, $iospush, $webpush, $slack, $ms_teams, $inbox, "
-            "$timezone, $locale — and any custom key-value properties."
+            "$timezone (IANA tz e.g. 'America/New_York'), $locale (language code e.g. 'en', 'es', 'es-AR') "
+            "— use $locale for language, NEVER $preferred_language or $language — "
+            "and any custom key-value properties."
         ),
     )
     workspace: str = Field(
@@ -354,13 +356,19 @@ class UpdateUserInput(BaseModel):
         description=(
             "List of operation dicts to apply to the user. Each dict is one operation. "
             "Supported operations: "
-            '$set — add/update properties e.g. {"$set": {"name": "Alice", "$timezone": "America/New_York"}}; '
-            '$unset — remove properties or entire channels e.g. {"$unset": ["$sms", "old_prop"]}; '
+            '$set — add/update non-channel properties e.g. {"$set": {"name": "Alice", "$timezone": "America/New_York", "$locale": "es"}}. '
+            "System properties: $name (display name), $timezone (IANA tz, e.g. 'America/New_York'), "
+            "$locale (language/locale code, e.g. 'en', 'es', 'es-AR') — use $locale, NEVER $preferred_language or $language. "
+            "NEVER use $set for channel addresses ($email, $sms, $whatsapp, etc.) — it will not work. "
+            '$unset — remove an entire channel or property e.g. {"$unset": ["$email", "old_prop"]}; '
             '$append — add a channel address e.g. {"$append": {"$email": "alice@example.com"}}; '
-            '$remove — remove a specific channel address e.g. {"$remove": {"$email": "alice@example.com"}}; '
+            '$remove — remove one specific channel address e.g. {"$remove": {"$email": "old@example.com"}}; '
             '$set_once — set immutable property e.g. {"$set_once": {"first_seen": "2025-01-01"}}; '
             '$increment — numeric delta e.g. {"$increment": {"login_count": 1}}. '
-            "Multiple operations can be combined in a single call."
+            "Multiple operations can be combined in a single call. "
+            "IMPORTANT — to change/replace a channel address (e.g. update email): "
+            'use {"$unset": ["$email"]} followed by {"$append": {"$email": "new@example.com"}} in the same call. '
+            "Never use $set, $add, or any other operation for channel updates."
         ),
     )
     workspace: str = Field(
@@ -382,10 +390,13 @@ class UpdateUserTool(SuprSendTool):
     name = "update_user"
     description = (
         "Apply partial updates to an existing user profile using operations. "
-        "Use $set to add/overwrite properties, $unset to remove an entire channel or property, "
-        "$append to add a specific channel address, $remove to remove a specific channel address, "
-        "$set_once to set an immutable property, $increment for numeric counters. "
-        "Multiple operations can be combined in one call."
+        "For non-channel properties use $set. "
+        "To add a channel address use $append. "
+        "To remove a specific channel address use $remove. "
+        "To remove an entire channel use $unset. "
+        "To CHANGE/REPLACE a channel address (e.g. update email, SMS): "
+        "combine $unset (remove the channel) + $append (add new address) in a single call. "
+        "NEVER use $set for channel addresses — it does not work for channels."
     )
     args_schema = UpdateUserInput
     permission_category = "subscribers"

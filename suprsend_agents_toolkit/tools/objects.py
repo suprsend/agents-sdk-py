@@ -301,13 +301,19 @@ class UpdateObjectInput(BaseModel):
         description=(
             "List of operation dicts to apply to the object. Each dict is one operation. "
             "Supported operations: "
-            '$set — add/update properties e.g. {"$set": {"name": "Team Alpha", "$timezone": "UTC"}}; '
-            '$unset — remove properties or entire channels e.g. {"$unset": ["$sms", "old_prop"]}; '
+            '$set — add/update non-channel properties e.g. {"$set": {"name": "Team Alpha", "$timezone": "UTC", "$locale": "es"}}. '
+            "System properties: $timezone (IANA tz e.g. 'UTC'), $locale (language code e.g. 'en', 'es') "
+            "— use $locale for language, NEVER $preferred_language or $language. "
+            "NEVER use $set for channel addresses ($email, $sms, $whatsapp, etc.) — it will not work. "
+            '$unset — remove an entire channel or property e.g. {"$unset": ["$email", "old_prop"]}; '
             '$append — add a channel address e.g. {"$append": {"$email": "team@example.com"}}; '
-            '$remove — remove a specific channel address e.g. {"$remove": {"$email": "team@example.com"}}; '
+            '$remove — remove one specific channel address e.g. {"$remove": {"$email": "old@example.com"}}; '
             '$set_once — set immutable property e.g. {"$set_once": {"created_at": "2025-01-01"}}; '
             '$increment — numeric delta e.g. {"$increment": {"member_count": 1}}. '
-            "Multiple operations can be combined in a single call."
+            "Multiple operations can be combined in a single call. "
+            "IMPORTANT — to change/replace a channel address (e.g. update email): "
+            'use {"$unset": ["$email"]} followed by {"$append": {"$email": "new@example.com"}} in the same call. '
+            "Never use $set, $add, or any other operation for channel updates."
         ),
     )
     workspace: str = Field(
