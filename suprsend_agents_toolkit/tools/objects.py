@@ -335,10 +335,13 @@ class UpdateObjectTool(SuprSendTool):
     name = "update_object"
     description = (
         "Apply partial updates to an existing object using operations. "
-        "Use $set to add/overwrite properties, $unset to remove an entire channel or property, "
-        "$append to add a specific channel address, $remove to remove a specific channel address, "
-        "$set_once to set an immutable property, $increment for numeric counters. "
-        "Multiple operations can be combined in one call."
+        "For non-channel properties use $set. "
+        "To add a channel address use $append. "
+        "To remove a specific channel address use $remove. "
+        "To remove an entire channel use $unset. "
+        "To CHANGE/REPLACE a channel address (e.g. update email): "
+        "combine $unset (remove the channel) + $append (add new address) in a single call. "
+        "NEVER use $set for channel addresses — it does not work for channels."
     )
     args_schema = UpdateObjectInput
     permission_category = "subscribers"
