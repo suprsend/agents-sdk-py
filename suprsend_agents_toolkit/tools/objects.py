@@ -230,9 +230,25 @@ class CreateObjectInput(BaseModel):
     properties: dict = Field(
         default={},
         description=(
-            "Object properties to set. Supports system properties like $name, $email, $sms, "
-            "$whatsapp, $androidpush, $iospush, $webpush, $slack, $ms_teams, $inbox — "
-            "and any custom key-value properties."
+            "Object properties to set. Channel addresses and system properties:\n"
+            "  $email: [\"team@example.com\"]  — array of email strings\n"
+            "  $sms: [\"+12025551234\"]  — array of E.164 phone number strings\n"
+            "  $whatsapp: [\"+12025551234\"]  — array of E.164 phone number strings\n"
+            "  $inbox: [\"inbox_id\"]  — array of inbox identifier strings\n"
+            "  $androidpush: [\"fcm_token\"]  — array of push token strings\n"
+            "  $iospush: [\"apns_token\"]  — array of push token strings\n"
+            "  $webpush: [{\"token\": \"...\", \"endpoint\": \"https://...\", \"keys\": {\"p256dh\": \"...\", \"auth\": \"...\"}}]\n"
+            "  $slack: array of objects — four formats:\n"
+            "    email+token:    {\"email\": \"user@example.com\", \"access_token\": \"xoxb-...\"}\n"
+            "    user_id+token:  {\"user_id\": \"UXXXXXXXX\", \"access_token\": \"xoxb-...\"}\n"
+            "    channel+token:  {\"channel\": \"CXXXXXXXX\", \"access_token\": \"xoxb-...\"}\n"
+            "    webhook:        {\"incoming_webhook\": {\"url\": \"https://hooks.slack.com/...\"}}\n"
+            "  $ms_teams: array of objects — three formats:\n"
+            "    conversation:   {\"tenant_id\": \"...\", \"service_url\": \"https://...\", \"conversation_id\": \"...\"}\n"
+            "    user_id:        {\"tenant_id\": \"...\", \"service_url\": \"https://...\", \"user_id\": \"...\"}\n"
+            "    webhook:        {\"incoming_webhook\": {\"url\": \"https://wnk1z.webhook.office.com/...\"}}\n"
+            "  $timezone: IANA timezone string e.g. 'America/New_York'\n"
+            "  Any additional custom key-value pairs are also accepted."
         ),
     )
     workspace: str = Field(
@@ -299,21 +315,42 @@ class UpdateObjectInput(BaseModel):
     )
     operations: list = Field(
         description=(
-            "List of operation dicts to apply to the object. Each dict is one operation. "
-            "Supported operations: "
-            '$set — add/update non-channel properties e.g. {"$set": {"name": "Team Alpha", "$timezone": "UTC", "$locale": "es"}}. '
-            "System properties: $timezone (IANA tz e.g. 'UTC'), $locale (language code e.g. 'en', 'es') "
-            "— use $locale for language, NEVER $preferred_language or $language. "
-            "NEVER use $set for channel addresses ($email, $sms, $whatsapp, etc.) — it will not work. "
-            '$unset — remove an entire channel or property e.g. {"$unset": ["$email", "old_prop"]}; '
-            '$append — add a channel address e.g. {"$append": {"$email": "team@example.com"}}; '
-            '$remove — remove one specific channel address e.g. {"$remove": {"$email": "old@example.com"}}; '
-            '$set_once — set immutable property e.g. {"$set_once": {"created_at": "2025-01-01"}}; '
-            '$increment — numeric delta e.g. {"$increment": {"member_count": 1}}. '
-            "Multiple operations can be combined in a single call. "
-            "IMPORTANT — to change/replace a channel address (e.g. update email): "
-            'use {"$unset": ["$email"]} followed by {"$append": {"$email": "new@example.com"}} in the same call. '
-            "Never use $set, $add, or any other operation for channel updates."
+            "List of operation dicts to apply to the object. Each dict is one operation.\n"
+            "Supported operations:\n"
+            "  $set — add/update non-channel properties:\n"
+            '    {"$set": {"name": "Team Alpha", "$timezone": "UTC", "$locale": "es"}}\n'
+            "    System properties: $timezone (IANA tz), $locale (language code e.g. 'en', 'es') "
+            "— NEVER $preferred_language or $language.\n"
+            "    NEVER use $set for channel addresses — it does not work for channels.\n"
+            "  $unset — remove an entire channel or property:\n"
+            '    {"$unset": ["$email", "old_prop"]}\n'
+            "  $append — add one channel address (use the exact structure for each channel type):\n"
+            '    email:     {"$append": {"$email": "team@example.com"}}\n'
+            '    sms:       {"$append": {"$sms": "+12025551234"}}\n'
+            '    whatsapp:  {"$append": {"$whatsapp": "+12025551234"}}\n'
+            '    inbox:     {"$append": {"$inbox": "inbox_id"}}\n'
+            '    androidpush: {"$append": {"$androidpush": "fcm_token"}}\n'
+            '    iospush:   {"$append": {"$iospush": "apns_token"}}\n'
+            '    webpush:   {"$append": {"$webpush": {"token": "...", "endpoint": "https://...", "keys": {"p256dh": "...", "auth": "..."}}}}\n'
+            "    slack — pick ONE format per entry:\n"
+            '      {"$append": {"$slack": {"email": "user@example.com", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"user_id": "UXXXXXXXX", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"channel": "CXXXXXXXX", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"incoming_webhook": {"url": "https://hooks.slack.com/..."}}}}\n'
+            "    ms_teams — pick ONE format per entry:\n"
+            '      {"$append": {"$ms_teams": {"tenant_id": "...", "service_url": "https://...", "conversation_id": "..."}}}\n'
+            '      {"$append": {"$ms_teams": {"tenant_id": "...", "service_url": "https://...", "user_id": "..."}}}\n'
+            '      {"$append": {"$ms_teams": {"incoming_webhook": {"url": "https://wnk1z.webhook.office.com/..."}}}}\n'
+            "  $remove — remove one specific channel address (same structure as $append):\n"
+            '    {"$remove": {"$email": "old@example.com"}}\n'
+            "  $set_once — set immutable property:\n"
+            '    {"$set_once": {"created_at": "2025-01-01"}}\n'
+            "  $increment — numeric delta:\n"
+            '    {"$increment": {"member_count": 1}}\n'
+            "Multiple operations can be combined in a single call.\n"
+            "IMPORTANT — to change/replace a channel address:\n"
+            '  use {"$unset": ["$email"]} + {"$append": {"$email": "new@example.com"}} in the same call.\n'
+            "  Never use $set, $add, or any other operation for channel updates."
         ),
     )
     workspace: str = Field(
