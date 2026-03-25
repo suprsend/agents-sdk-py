@@ -50,6 +50,7 @@ from suprsend_agents_toolkit.tools.management import (
     CommitSchemaTool,
     LinkEventSchemaTool,
 )
+from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
 from suprsend_agents_toolkit.tools.validate_schema import ValidateSchemaTool
@@ -106,6 +107,9 @@ _ALL_TOOLS: dict[str, type] = {
     "push_schema": PushSchemaTool,
     "commit_schema": CommitSchemaTool,
     "link_event_schema": LinkEventSchemaTool,
+    # lists
+    "add_user_to_list": AddUserToListTool,
+    "remove_user_from_list": RemoveUserFromListTool,
     # workflows (trigger)
     "trigger_workflow": TriggerWorkflowTool,
     # events
