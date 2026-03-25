@@ -124,3 +124,54 @@ class UpdateTranslationTool(ManagementTool):
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"updating translation '{filename}' in workspace '{ws}'")
+
+
+# ── CommitTranslationTool ─────────────────────────────────────────────────────
+
+class CommitTranslationInput(BaseModel):
+    commit_message: str = Field(
+        default="",
+        description="Description of the translation changes being committed. Optional but recommended.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CommitTranslationTool(ManagementTool):
+    """PATCH {mgmnt_url}/v1/{ws}/translation/commit/"""
+
+    name = "commit_translation"
+    description = (
+        "Commit the current translation draft to live. "
+        "Makes all pending translation file changes active. "
+        "Always call update_translation first to stage changes, then commit_translation to deploy them."
+    )
+    args_schema = CommitTranslationInput
+    permission_subcategory = "translations"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        commit_message: str = "",
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", None
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.translations.commit,
+                ws,
+                commit_message,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"committing translations in workspace '{ws}'")
