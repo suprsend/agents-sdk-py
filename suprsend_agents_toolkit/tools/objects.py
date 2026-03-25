@@ -469,11 +469,21 @@ class UpdateObjectPreferenceCategoryInput(BaseModel):
     )
     opt_in_channels: list = Field(
         default_factory=list,
-        description=f"Channels to opt into for this category. Valid values: {_CHANNELS_DESC_OBJ}.",
+        description=(
+            f"Specific channels to opt into for this category. Valid values: {_CHANNELS_DESC_OBJ}. "
+            "ONLY provide this when the user names particular channels (e.g. 'only email', 'email and SMS'). "
+            "If the user says 'all channels', 'everything', or does not specify channels — "
+            "OMIT this field entirely. Omitting means all channels. NEVER list every channel to mean 'all'."
+        ),
     )
     opt_out_channels: list = Field(
         default_factory=list,
-        description=f"Channels to opt out of for this category. Valid values: {_CHANNELS_DESC_OBJ}.",
+        description=(
+            f"Specific channels to opt out of for this category. Valid values: {_CHANNELS_DESC_OBJ}. "
+            "ONLY provide this when the user names particular channels (e.g. 'only SMS'). "
+            "If the user says 'all channels', 'everything', or does not specify channels — "
+            "OMIT this field entirely. Omitting means all channels. NEVER list every channel to mean 'all'."
+        ),
     )
     tenant_id: str = Field(
         default="",
@@ -496,7 +506,7 @@ class UpdateObjectPreferenceCategoryTool(SuprSendTool):
     description = (
         "Update an object's opt-in or opt-out preference for a specific notification category. "
         "Set preference to 'opt_in' or 'opt_out' for the category as a whole. "
-        "Optionally restrict to specific channels via opt_in_channels or opt_out_channels. "
+        "To apply to all channels omit opt_in_channels/opt_out_channels; to restrict to specific channels provide them. "
         "Scope to a tenant with tenant_id for tenant-level preferences."
     )
     args_schema = UpdateObjectPreferenceCategoryInput

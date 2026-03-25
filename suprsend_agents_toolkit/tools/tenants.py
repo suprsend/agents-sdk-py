@@ -216,15 +216,25 @@ class UpdateTenantPreferenceCategoryInput(BaseModel):
     )
     mandatory_channels: list = Field(
         default_factory=list,
-        description=f"Channels that subscribers cannot opt out of for this category. Valid: {_CHANNELS_DESC_TENANT}.",
+        description=(
+            f"Channels subscribers cannot opt out of. Valid: {_CHANNELS_DESC_TENANT}. "
+            "ONLY provide when specific channels are named. Omit for all channels or when not applicable."
+        ),
     )
     opt_in_channels: list = Field(
         default_factory=list,
-        description=f"Channels that are opted in by default for this category. Valid: {_CHANNELS_DESC_TENANT}.",
+        description=(
+            f"Channels opted in by default for this category. Valid: {_CHANNELS_DESC_TENANT}. "
+            "ONLY provide when the user names particular channels. "
+            "Omit entirely if applying to all channels — omitting means all channels."
+        ),
     )
     blocked_channels: list = Field(
         default_factory=list,
-        description=f"Channels completely blocked for this category under this tenant. Valid: {_CHANNELS_DESC_TENANT}.",
+        description=(
+            f"Channels completely blocked for this category. Valid: {_CHANNELS_DESC_TENANT}. "
+            "ONLY provide when specific channels are named. Omit for all channels or when not applicable."
+        ),
     )
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
 

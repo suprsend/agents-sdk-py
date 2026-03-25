@@ -98,7 +98,10 @@ class UpdatePreferenceCategoryTool(ManagementTool):
         "complete tree back here. "
         "Each category supports: category (slug), name, description, "
         "default_preference ('opt_in' | 'opt_out' | 'cant_unsubscribe'), "
-        "default_mandatory_channels (list), default_opt_in_channels (list), tags (list). "
+        "default_mandatory_channels (list of specific channels — omit or leave empty for all channels), "
+        "default_opt_in_channels (list of specific channels — omit or leave empty for all channels), "
+        "tags (list). "
+        "For channel lists: only populate when the user names specific channels; omit to apply to all channels. "
         "Set commit=True to deploy immediately, or leave False to save as a draft first."
     )
     args_schema = UpdatePreferenceCategoryInput
