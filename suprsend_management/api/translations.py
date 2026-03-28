@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import requests
+from urllib.parse import quote
 
-from suprsend_management.api.base import BaseApi
+from suprsend_management.api.base import BaseApi, _DEFAULT_TIMEOUT
 from suprsend_management.exception import SuprsendManagementException
 
 
 class TranslationsApi(BaseApi):
-    """Management API callers for GET v1/{ws}/translation/content/{filename}/"""
+    """Management API callers for translation endpoints."""
 
     def _url(self, workspace: str, filename: str) -> str:
-        return f"{self.config.base_url}/v1/{workspace}/translation/content/{filename}/"
+        return f"{self.config.base_url}/v1/{quote(workspace, safe='')}/translation/content/{quote(filename, safe='')}/"
 
     def get(self, workspace: str, filename: str, extra_headers: dict | None = None) -> dict:
         """
@@ -27,7 +28,31 @@ class TranslationsApi(BaseApi):
         Raises:
             SuprsendManagementException: on 4xx / 5xx responses.
         """
-        resp = requests.get(self._url(workspace, filename), headers=self._headers(extra_headers))
+        resp = requests.get(self._url(workspace, filename), headers=self._headers(extra_headers), timeout=_DEFAULT_TIMEOUT)
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def upsert(self, workspace: str, filename: str, content: dict,
+               extra_headers: dict | None = None) -> dict:
+        """POST /v1/{workspace}/translation/content/{filename}/ — create or update a translation file."""
+        resp = requests.post(
+            self._url(workspace, filename),
+            json={"locale": filename, "content": content},
+            headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def commit(self, workspace: str, commit_message: str = "", extra_headers: dict | None = None) -> dict:
+        """PATCH /v1/{workspace}/translation/commit/ — commit translation draft to live."""
+        url = f"{self.config.base_url}/v1/{quote(workspace, safe='')}/translation/commit/"
+        params = {}
+        if commit_message:
+            params["commit_message"] = commit_message
+        resp = requests.patch(url, params=params, headers=self._headers(extra_headers), timeout=_DEFAULT_TIMEOUT)
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
         return resp.json()

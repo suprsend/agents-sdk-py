@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(repr=False)
 class ToolContext:
     """
     Workspace-level defaults. Attached to the client at construction time
@@ -27,3 +27,11 @@ class ToolContext:
     # Internal — override only if pointing at a self-hosted or staging instance
     base_url: str = "https://hub.suprsend.com"
     mgmnt_url: str = "https://management-api.suprsend.com"
+
+    def __repr__(self) -> str:
+        masked_secret = "***" if self.api_secret else ""
+        return (
+            f"ToolContext(workspace={self.workspace!r}, tenant_id={self.tenant_id!r}, "
+            f"dashboard_url={self.dashboard_url!r}, api_secret={masked_secret!r}, "
+            f"base_url={self.base_url!r}, mgmnt_url={self.mgmnt_url!r})"
+        )

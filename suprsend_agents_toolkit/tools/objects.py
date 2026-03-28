@@ -1,7 +1,9 @@
 import asyncio
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
@@ -58,9 +60,9 @@ class GetObjectTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.objects.get, object_type, object_id)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching object '{object_type}/{object_id}': {e}"
+            return self._api_error(e, f"fetching object '{object_type}/{object_id}'")
 
 
 # ── GetObjectPreferenceTool ───────────────────────────────────────────────────
@@ -138,9 +140,9 @@ class GetObjectPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.objects.get_full_preference, object_type, object_id, options or None
                 )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching preferences for object '{object_type}/{object_id}': {e}"
+            return self._api_error(e, f"fetching preferences for object '{object_type}/{object_id}'")
 
 
 # ── GetObjectSubscriptionsTool ────────────────────────────────────────────────
@@ -211,6 +213,448 @@ class GetObjectSubscriptionsTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.objects.get_subscriptions, object_type, object_id, options
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching subscriptions for object '{object_type}/{object_id}': {e}"
+            return self._api_error(e, f"fetching subscriptions for object '{object_type}/{object_id}'")
+
+
+# ── CreateObjectTool ──────────────────────────────────────────────────────────
+
+class CreateObjectInput(BaseModel):
+    object_type: str = Field(
+        description="Type of the object. Should be a plural namespace (e.g. 'departments', 'teams')."
+    )
+    object_id: str = Field(
+        description="Unique identifier of the object within the given object_type."
+    )
+    properties: dict = Field(
+        default={},
+        description=(
+            "Object properties to set. Channel addresses and system properties:\n"
+            "  $email: [\"team@example.com\"]  — array of email strings\n"
+            "  $sms: [\"+12025551234\"]  — array of E.164 phone number strings\n"
+            "  $whatsapp: [\"+12025551234\"]  — array of E.164 phone number strings\n"
+            "  $inbox: [\"inbox_id\"]  — array of inbox identifier strings\n"
+            "  $androidpush: [\"fcm_token\"]  — array of push token strings\n"
+            "  $iospush: [\"apns_token\"]  — array of push token strings\n"
+            "  $webpush: [{\"token\": \"...\", \"endpoint\": \"https://...\", \"keys\": {\"p256dh\": \"...\", \"auth\": \"...\"}}]\n"
+            "  $slack: array of objects — four formats:\n"
+            "    email+token:    {\"email\": \"user@example.com\", \"access_token\": \"xoxb-...\"}\n"
+            "    user_id+token:  {\"user_id\": \"UXXXXXXXX\", \"access_token\": \"xoxb-...\"}\n"
+            "    channel+token:  {\"channel\": \"CXXXXXXXX\", \"access_token\": \"xoxb-...\"}\n"
+            "    webhook:        {\"incoming_webhook\": {\"url\": \"https://hooks.slack.com/...\"}}\n"
+            "  $ms_teams: array of objects — three formats:\n"
+            "    conversation:   {\"tenant_id\": \"...\", \"service_url\": \"https://...\", \"conversation_id\": \"...\"}\n"
+            "    user_id:        {\"tenant_id\": \"...\", \"service_url\": \"https://...\", \"user_id\": \"...\"}\n"
+            "    webhook:        {\"incoming_webhook\": {\"url\": \"https://wnk1z.webhook.office.com/...\"}}\n"
+            "  $timezone: IANA timezone string e.g. 'America/New_York'\n"
+            "  Any additional custom key-value pairs are also accepted."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+    @field_validator("properties", mode="before")
+    @classmethod
+    def parse_properties(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class CreateObjectTool(SuprSendTool):
+    """POST {base_url}/v1/object/{object_type}/{object_id}/"""
+
+    name = "create_object"
+    description = (
+        "Create or fully replace an object profile. Objects represent entities in your system "
+        "(teams, departments, organizations) that can receive notifications and have subscribers. "
+        "Provide object_type, object_id, and a properties dict. "
+        "This is an upsert — if the object already exists its profile is replaced."
+    )
+    args_schema = CreateObjectInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        properties: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.objects.upsert, object_type, object_id, properties)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"creating object '{object_type}/{object_id}'")
+
+
+# ── UpdateObjectTool ──────────────────────────────────────────────────────────
+
+class UpdateObjectInput(BaseModel):
+    object_type: str = Field(
+        description="Type of the object. Should be a plural namespace (e.g. 'departments', 'teams')."
+    )
+    object_id: str = Field(
+        description="Unique identifier of the object within the given object_type."
+    )
+    operations: list = Field(
+        description=(
+            "List of operation dicts to apply to the object. Each dict is one operation.\n"
+            "Supported operations:\n"
+            "  $set — add/update non-channel properties:\n"
+            '    {"$set": {"name": "Team Alpha", "$timezone": "UTC", "$locale": "es"}}\n'
+            "    System properties: $timezone (IANA tz), $locale (language code e.g. 'en', 'es') "
+            "— NEVER $preferred_language or $language.\n"
+            "    NEVER use $set for channel addresses — it does not work for channels.\n"
+            "  $unset — remove an entire channel or property:\n"
+            '    {"$unset": ["$email", "old_prop"]}\n'
+            "  $append — add one channel address (use the exact structure for each channel type):\n"
+            '    email:     {"$append": {"$email": "team@example.com"}}\n'
+            '    sms:       {"$append": {"$sms": "+12025551234"}}\n'
+            '    whatsapp:  {"$append": {"$whatsapp": "+12025551234"}}\n'
+            '    inbox:     {"$append": {"$inbox": "inbox_id"}}\n'
+            '    androidpush: {"$append": {"$androidpush": "fcm_token"}}\n'
+            '    iospush:   {"$append": {"$iospush": "apns_token"}}\n'
+            '    webpush:   {"$append": {"$webpush": {"token": "...", "endpoint": "https://...", "keys": {"p256dh": "...", "auth": "..."}}}}\n'
+            "    slack — pick ONE format per entry:\n"
+            '      {"$append": {"$slack": {"email": "user@example.com", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"user_id": "UXXXXXXXX", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"channel": "CXXXXXXXX", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"incoming_webhook": {"url": "https://hooks.slack.com/..."}}}}\n'
+            "    ms_teams — pick ONE format per entry:\n"
+            '      {"$append": {"$ms_teams": {"tenant_id": "...", "service_url": "https://...", "conversation_id": "..."}}}\n'
+            '      {"$append": {"$ms_teams": {"tenant_id": "...", "service_url": "https://...", "user_id": "..."}}}\n'
+            '      {"$append": {"$ms_teams": {"incoming_webhook": {"url": "https://wnk1z.webhook.office.com/..."}}}}\n'
+            "  $remove — remove one specific channel address (same structure as $append):\n"
+            '    {"$remove": {"$email": "old@example.com"}}\n'
+            "  $set_once — set immutable property:\n"
+            '    {"$set_once": {"created_at": "2025-01-01"}}\n'
+            "  $increment — numeric delta:\n"
+            '    {"$increment": {"member_count": 1}}\n'
+            "Multiple operations can be combined in a single call.\n"
+            "IMPORTANT — to change/replace a channel address:\n"
+            '  use {"$unset": ["$email"]} + {"$append": {"$email": "new@example.com"}} in the same call.\n'
+            "  Never use $set, $add, or any other operation for channel updates."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+    @field_validator("operations", mode="before")
+    @classmethod
+    def parse_operations(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateObjectTool(SuprSendTool):
+    """PATCH {base_url}/v1/object/{object_type}/{object_id}/"""
+
+    name = "update_object"
+    description = (
+        "Apply partial updates to an existing object using operations. "
+        "For non-channel properties use $set. "
+        "To add a channel address use $append. "
+        "To remove a specific channel address use $remove. "
+        "To remove an entire channel use $unset. "
+        "To CHANGE/REPLACE a channel address (e.g. update email): "
+        "combine $unset (remove the channel) + $append (add new address) in a single call. "
+        "NEVER use $set for channel addresses — it does not work for channels."
+    )
+    args_schema = UpdateObjectInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        operations: list = [],
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not operations:
+            return "Error: operations list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.objects.edit, object_type, object_id, {"operations": operations})
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating object '{object_type}/{object_id}'")
+
+
+# ── AddObjectSubscriptionTool ─────────────────────────────────────────────────
+
+class AddObjectSubscriptionInput(BaseModel):
+    object_type: str = Field(
+        description="Type of the parent object. Should be a plural namespace (e.g. 'departments', 'teams')."
+    )
+    object_id: str = Field(
+        description="Unique identifier of the parent object."
+    )
+    recipients: list = Field(
+        description=(
+            "List of recipients to subscribe. Each entry is either a user's distinct_id string, "
+            'or an object reference dict like {"object_type": "teams", "id": "team_123"}.'
+        ),
+    )
+    properties: dict = Field(
+        default={},
+        description=(
+            "Subscription-level properties shared across all recipients in this call. "
+            "Accessible in workflow templates as $recipient.subscription.<key>."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+    @field_validator("recipients", "properties", mode="before")
+    @classmethod
+    def parse_json_fields(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class AddObjectSubscriptionTool(SuprSendTool):
+    """POST {base_url}/v1/object/{object_type}/{object_id}/subscription/"""
+
+    name = "add_object_subscription"
+    description = (
+        "Add one or more subscribers (users or child objects) to an object. "
+        "Recipients can be user distinct_id strings or object reference dicts. "
+        "Optional subscription-level properties are accessible in notification templates "
+        "as $recipient.subscription.<key>."
+    )
+    args_schema = AddObjectSubscriptionInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        recipients: list = [],
+        properties: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not recipients:
+            return "Error: recipients list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            payload = {"recipients": recipients, "properties": properties}
+            result = await asyncio.to_thread(sdk.objects.create_subscriptions, object_type, object_id, payload)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"adding subscriptions to object '{object_type}/{object_id}'")
+
+
+# ── UpdateObjectPreferenceCategoryTool ────────────────────────────────────────
+
+_VALID_CHANNELS_OBJ = ["email", "sms", "whatsapp", "androidpush", "iospush", "webpush", "inbox", "slack", "ms_teams"]
+_CHANNELS_DESC_OBJ = ", ".join(f'"{c}"' for c in _VALID_CHANNELS_OBJ)
+
+
+class UpdateObjectPreferenceCategoryInput(BaseModel):
+    object_type: str = Field(description="Type/namespace of the object.")
+    object_id: str = Field(description="Unique identifier of the object within its type.")
+    category: str = Field(description="Preference category slug to update.")
+    preference: str = Field(
+        description='Opt-in/out decision for the category. Must be "opt_in" or "opt_out".',
+    )
+    opt_in_channels: list = Field(
+        default_factory=list,
+        description=(
+            f"Specific channels to opt into for this category. Valid values: {_CHANNELS_DESC_OBJ}. "
+            "ONLY provide this when the user names particular channels (e.g. 'only email', 'email and SMS'). "
+            "If the user says 'all channels', 'everything', or does not specify channels — "
+            "OMIT this field entirely. Omitting means all channels. NEVER list every channel to mean 'all'."
+        ),
+    )
+    opt_out_channels: list = Field(
+        default_factory=list,
+        description=(
+            f"Specific channels to opt out of for this category. Valid values: {_CHANNELS_DESC_OBJ}. "
+            "ONLY provide this when the user names particular channels (e.g. 'only SMS'). "
+            "If the user says 'all channels', 'everything', or does not specify channels — "
+            "OMIT this field entirely. Omitting means all channels. NEVER list every channel to mean 'all'."
+        ),
+    )
+    tenant_id: str = Field(
+        default="",
+        description="Tenant scope for the preference update. Omit for the global (default) tenant.",
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("opt_in_channels", "opt_out_channels", mode="before")
+    @classmethod
+    def parse_channels(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateObjectPreferenceCategoryTool(SuprSendTool):
+    """PATCH {base_url}/v1/object/{object_type}/{object_id}/preference/category/{category}/"""
+
+    name = "update_object_preference_category"
+    description = (
+        "Update an object's opt-in or opt-out preference for a specific notification category. "
+        "Set preference to 'opt_in' or 'opt_out' for the category as a whole. "
+        "To apply to all channels omit opt_in_channels/opt_out_channels; to restrict to specific channels provide them. "
+        "Scope to a tenant with tenant_id for tenant-level preferences."
+    )
+    args_schema = UpdateObjectPreferenceCategoryInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        category: str = "",
+        preference: str = "",
+        opt_in_channels: list = [],
+        opt_out_channels: list = [],
+        tenant_id: str = "",
+        **kwargs,
+    ):
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not category:
+            return "Error: category is required."
+        if preference not in ("opt_in", "opt_out"):
+            return "Error: preference must be 'opt_in' or 'opt_out'."
+        payload: dict = {"preference": preference}
+        if opt_in_channels:
+            payload["opt_in_channels"] = opt_in_channels
+        if opt_out_channels:
+            payload["opt_out_channels"] = opt_out_channels
+        options = {"tenant_id": tenant_id} if tenant_id else None
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.objects.update_category_preference, object_type, object_id, category, payload, options
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating category preference for object '{object_type}/{object_id}'")
+
+
+# ── UpdateObjectPreferenceChannelTool ─────────────────────────────────────────
+
+class UpdateObjectPreferenceChannelInput(BaseModel):
+    object_type: str = Field(description="Type/namespace of the object.")
+    object_id: str = Field(description="Unique identifier of the object within its type.")
+    channel_preferences: list = Field(
+        description=(
+            f"List of channel preference objects. Each item must have: "
+            f'"channel" (one of {_CHANNELS_DESC_OBJ}) and '
+            f'"is_restricted" (bool — true blocks the channel, false enables it).'
+        ),
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("channel_preferences", mode="before")
+    @classmethod
+    def parse_channel_preferences(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateObjectPreferenceChannelTool(SuprSendTool):
+    """PATCH {base_url}/v1/object/{object_type}/{object_id}/preference/channel_preference/"""
+
+    name = "update_object_preference_channel"
+    description = (
+        "Update an object's overall channel-level notification preferences. "
+        "Set is_restricted=true to block a channel entirely for the object, false to enable it. "
+        "Multiple channels can be updated in a single call."
+    )
+    args_schema = UpdateObjectPreferenceChannelInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        object_type: str = "",
+        object_id: str = "",
+        channel_preferences: list = [],
+        **kwargs,
+    ):
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not object_type:
+            return "Error: object_type is required."
+        if not object_id:
+            return "Error: object_id is required."
+        if not channel_preferences:
+            return "Error: channel_preferences list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.objects.update_channel_preference,
+                object_type,
+                object_id,
+                {"channel_preferences": channel_preferences},
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating channel preferences for object '{object_type}/{object_id}'")

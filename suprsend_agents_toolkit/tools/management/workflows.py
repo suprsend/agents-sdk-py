@@ -1,6 +1,8 @@
+import asyncio
+import json
 import yaml
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
@@ -34,7 +36,9 @@ class ListWorkflowsInput(BaseModel):
     )
     limit: int = Field(
         default=10,
-        description="Maximum number of workflows to return (max 50).",
+        ge=1,
+        le=50,
+        description="Maximum number of workflows to return (1–50).",
     )
     offset: int = Field(
         default=0,
@@ -81,29 +85,21 @@ class ListWorkflowsTool(ManagementTool):
         if not ws:
             return "Error: workspace is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.list(
-                    kw.pop("workspace"),
-                    search=kw.pop("search") or None,
-                    slugs=kw.pop("slugs") or None,
-                    include_archived=kw.pop("include_archived"),
-                    order_by=kw.pop("order_by") or None,
-                    limit=kw.pop("limit"),
-                    offset=kw.pop("offset"),
-                    **kw,
-                ),
-                workspace=ws,
-                search=search,
-                slugs=slugs or [],
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.list,
+                ws,
+                search=search or None,
+                slugs=slugs or None,
                 include_archived=include_archived,
-                order_by=order_by,
+                order_by=order_by or None,
                 limit=limit,
                 offset=offset,
+                extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error listing workflows for workspace '{ws}': {e}"
+            return self._api_error(e, f"listing workflows for workspace '{ws}'")
 
 
 # ── GetWorkflowTool ───────────────────────────────────────────────────────────
@@ -146,16 +142,184 @@ class GetWorkflowTool(ManagementTool):
         if not workflow_slug:
             return "Error: workflow_slug is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.workflows.get(
-                    kw.pop("workspace"),
-                    kw.pop("workflow_slug"),
-                    **kw,
-                ),
-                workspace=ws,
-                workflow_slug=workflow_slug,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.get,
+                ws,
+                workflow_slug,
+                extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching workflow '{workflow_slug}': {e}"
+            return self._api_error(e, f"fetching workflow '{workflow_slug}'")
+
+
+# ── ValidateWorkflowTool ──────────────────────────────────────────────────────
+
+class ValidateWorkflowInput(BaseModel):
+    workflow_slug: str = Field(description="Slug of the workflow to validate.")
+    workflow: dict = Field(description="Full workflow definition as a dict (same shape as get_workflow response).")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("workflow", mode="before")
+    @classmethod
+    def parse_workflow(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class ValidateWorkflowTool(ManagementTool):
+    """POST {mgmnt_url}/v1/{ws}/workflow/{workflow_slug}/validate/"""
+
+    name = "validate_workflow"
+    description = (
+        "Validate a workflow definition without saving it. "
+        "Returns {\"is_valid\": true} if the definition is valid, or "
+        "{\"is_valid\": false, \"errors\": [...]} with details if it is not. "
+        "Use this to check a workflow before returning it to the main agent. "
+        "Does NOT write to the database."
+    )
+    args_schema = ValidateWorkflowInput
+    permission_subcategory = "workflows"
+    permission_operation = "read"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        workflow_slug: str = "",
+        workflow: dict = None,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not workflow_slug:
+            return "Error: workflow_slug is required.", {}
+        if not workflow:
+            return "Error: workflow definition is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.validate,
+                ws,
+                workflow_slug,
+                workflow,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"validating workflow '{workflow_slug}'")
+
+
+# ── PushWorkflowTool ──────────────────────────────────────────────────────────
+
+class PushWorkflowInput(BaseModel):
+    workflow_slug: str = Field(description="Slug of the workflow to create or update.")
+    workflow: dict = Field(description="Full workflow definition as a dict (same shape as get_workflow response).")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("workflow", mode="before")
+    @classmethod
+    def parse_workflow(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class PushWorkflowTool(ManagementTool):
+    """POST {mgmnt_url}/v1/{ws}/workflow/{workflow_slug}/"""
+
+    name = "push_workflow"
+    description = (
+        "Save a workflow definition as a draft (does not deploy). "
+        "Accepts the full workflow dict (same shape returned by get_workflow). "
+        "Always saves as draft — use commit_workflow to deploy to live."
+    )
+    args_schema = PushWorkflowInput
+    permission_subcategory = "workflows"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        workflow_slug: str = "",
+        workflow: dict = None,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not workflow_slug:
+            return "Error: workflow_slug is required.", {}
+        if not workflow:
+            return "Error: workflow definition is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.push,
+                ws,
+                workflow_slug,
+                workflow,
+                commit=False,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"pushing workflow '{workflow_slug}'")
+
+
+# ── CommitWorkflowTool ────────────────────────────────────────────────────────
+
+class CommitWorkflowInput(BaseModel):
+    workflow_slug: str = Field(description="Slug of the workflow draft to commit to live.")
+    commit_message: str = Field(default="", description="Optional message describing what changed.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class CommitWorkflowTool(ManagementTool):
+    """PATCH {mgmnt_url}/v1/{ws}/workflow/{workflow_slug}/commit/"""
+
+    name = "commit_workflow"
+    description = (
+        "Promote a saved workflow draft to live (deploy it). "
+        "Call this ONLY after push_workflow has saved a valid draft. "
+        "This is the final deployment step — it will trigger HitL confirmation."
+    )
+    args_schema = CommitWorkflowInput
+    permission_subcategory = "workflows"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        workflow_slug: str = "",
+        commit_message: str = "",
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not workflow_slug:
+            return "Error: workflow_slug is required."
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.workflows.commit,
+                ws,
+                workflow_slug,
+                commit_message=commit_message,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"committing workflow '{workflow_slug}'")

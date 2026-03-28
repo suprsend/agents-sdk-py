@@ -5,6 +5,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from suprsend_management.client import SuprsendManagement
 
+# Default timeout (seconds) for all management API requests.
+# Keeps the asyncio.to_thread worker from blocking indefinitely.
+_DEFAULT_TIMEOUT = 60
+
 
 class BaseApi:
     def __init__(self, config: "SuprsendManagement") -> None:

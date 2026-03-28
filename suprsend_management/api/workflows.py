@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import requests
+from urllib.parse import quote
 
-from suprsend_management.api.base import BaseApi
+from suprsend_management.api.base import BaseApi, _DEFAULT_TIMEOUT
 from suprsend_management.exception import SuprsendManagementException
 
 
@@ -12,9 +13,9 @@ class WorkflowsApi(BaseApi):
     """
 
     def _url(self, workspace: str, workflow_slug: str | None = None) -> str:
-        base = f"{self.config.base_url}/v1/{workspace}/workflow/"
+        base = f"{self.config.base_url}/v1/{quote(workspace, safe='')}/workflow/"
         if workflow_slug:
-            return f"{base}{workflow_slug}/"
+            return f"{base}{quote(workflow_slug, safe='')}/"
         return base
 
     def list(
@@ -66,6 +67,7 @@ class WorkflowsApi(BaseApi):
             self._url(workspace),
             headers=self._headers(extra_headers),
             params=params or None,
+            timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
@@ -94,6 +96,92 @@ class WorkflowsApi(BaseApi):
         resp = requests.get(
             self._url(workspace, workflow_slug),
             headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def validate(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        workflow: dict,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        POST /v1/{ws}/workflow/{slug}/validate/
+        Validates the workflow definition without saving to the database.
+
+        Args:
+            workspace:      Workspace slug.
+            workflow_slug:  The workflow identifier.
+            workflow:       Full workflow definition dict.
+            extra_headers:  Additional headers merged into the request.
+
+        Returns:
+            Validation result object — {"is_valid": bool, "errors": [...]}.
+
+        Raises:
+            SuprsendManagementException: on 4xx / 5xx responses.
+        """
+        resp = requests.post(
+            self._url(workspace, workflow_slug) + "validate/",
+            headers=self._headers(extra_headers),
+            json=workflow,
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def push(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        workflow: dict,
+        commit: bool = False,
+        commit_message: str = "",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        POST /v1/{workspace}/workflow/{slug}/
+        Creates or updates a workflow. commit=False saves as draft; commit=True deploys immediately.
+        Returns: {"validation_result": {"is_valid": bool, "errors": [...]}}
+        """
+        params = {"commit": "true" if commit else "false"}
+        if commit_message:
+            params["commit_message"] = commit_message
+        resp = requests.post(
+            self._url(workspace, workflow_slug),
+            headers=self._headers(extra_headers),
+            params=params,
+            json=workflow,
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def commit(
+        self,
+        workspace: str,
+        workflow_slug: str,
+        commit_message: str = "",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        PATCH /v1/{workspace}/workflow/{slug}/commit/
+        Promotes the saved draft to live. Lightweight — no workflow JSON needed.
+        """
+        body = {}
+        if commit_message:
+            body["commit_message"] = commit_message
+        resp = requests.patch(
+            self._url(workspace, workflow_slug) + "commit/",
+            headers=self._headers(extra_headers),
+            json=body,
+            timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)

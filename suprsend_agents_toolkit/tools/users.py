@@ -2,7 +2,9 @@ import asyncio
 
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
@@ -52,9 +54,9 @@ class GetUserTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(sdk.users.get, distinct_id)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching user '{distinct_id}'")
 
 
 # ── GetUserPreferenceTool ─────────────────────────────────────────────────────
@@ -161,9 +163,9 @@ class GetUserPreferenceTool(SuprSendTool):
                 result = await asyncio.to_thread(
                     sdk.users.get_full_preference, distinct_id, options or None
                 )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching preferences for user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching preferences for user '{distinct_id}'")
 
 
 # ── GetUserObjectSubscriptionsTool ────────────────────────────────────────────
@@ -218,9 +220,9 @@ class GetUserObjectSubscriptionsTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             options: dict = {"limit": limit}
             result = await asyncio.to_thread(sdk.users.get_objects_subscribed_to, distinct_id, options)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching object subscriptions for user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching object subscriptions for user '{distinct_id}'")
 
 
 # ── GetUserListSubscriptionsTool ──────────────────────────────────────────────
@@ -274,6 +276,348 @@ class GetUserListSubscriptionsTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             options: dict = {"limit": limit}
             result = await asyncio.to_thread(sdk.users.get_lists_subscribed_to, distinct_id, options)
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching list subscriptions for user '{distinct_id}': {e}"
+            return self._api_error(e, f"fetching list subscriptions for user '{distinct_id}'")
+
+
+# ── CreateUserTool ────────────────────────────────────────────────────────────
+
+class CreateUserInput(BaseModel):
+    distinct_id: str = Field(
+        description="Unique identifier of the user to create or update."
+    )
+    properties: dict = Field(
+        default={},
+        description=(
+            "User properties to set. Channel addresses and system properties:\n"
+            "  $email: [\"user@example.com\"]  — array of email strings\n"
+            "  $sms: [\"+12025551234\"]  — array of E.164 phone number strings\n"
+            "  $whatsapp: [\"+12025551234\"]  — array of E.164 phone number strings\n"
+            "  $inbox: [\"inbox_id\"]  — array of inbox identifier strings\n"
+            "  $androidpush: [\"fcm_token\"]  — array of push token strings\n"
+            "  $iospush: [\"apns_token\"]  — array of push token strings\n"
+            "  $webpush: [{\"token\": \"...\", \"endpoint\": \"https://...\", \"keys\": {\"p256dh\": \"...\", \"auth\": \"...\"}}]\n"
+            "  $slack: array of objects — four formats:\n"
+            "    email+token:    {\"email\": \"user@example.com\", \"access_token\": \"xoxb-...\"}\n"
+            "    user_id+token:  {\"user_id\": \"UXXXXXXXX\", \"access_token\": \"xoxb-...\"}\n"
+            "    channel+token:  {\"channel\": \"CXXXXXXXX\", \"access_token\": \"xoxb-...\"}\n"
+            "    webhook:        {\"incoming_webhook\": {\"url\": \"https://hooks.slack.com/...\"}}\n"
+            "  $ms_teams: array of objects — three formats:\n"
+            "    conversation:   {\"tenant_id\": \"...\", \"service_url\": \"https://...\", \"conversation_id\": \"...\"}\n"
+            "    user_id:        {\"tenant_id\": \"...\", \"service_url\": \"https://...\", \"user_id\": \"...\"}\n"
+            "    webhook:        {\"incoming_webhook\": {\"url\": \"https://wnk1z.webhook.office.com/...\"}}\n"
+            "  $timezone: IANA timezone string e.g. 'America/New_York'\n"
+            "  $locale: language/locale code e.g. 'en', 'es', 'es-AR' — NEVER $preferred_language or $language\n"
+            "  Any additional custom key-value pairs are also accepted."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+    @field_validator("properties", mode="before")
+    @classmethod
+    def parse_properties(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class CreateUserTool(SuprSendTool):
+    """POST {base_url}/v1/user/{distinct_id}/"""
+
+    name = "create_user"
+    description = (
+        "Create or fully replace a user profile. Provide the user's distinct_id and a properties "
+        "dict containing channel addresses ($email, $sms, $whatsapp, etc.) and any custom fields. "
+        "This is an upsert — if the user already exists their profile is replaced with the given properties."
+    )
+    args_schema = CreateUserInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        distinct_id: str = "",
+        properties: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not distinct_id:
+            return "Error: distinct_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.users.upsert, distinct_id, properties)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"creating user '{distinct_id}'")
+
+
+# ── UpdateUserTool ────────────────────────────────────────────────────────────
+
+class UpdateUserInput(BaseModel):
+    distinct_id: str = Field(
+        description="Unique identifier of the user to update."
+    )
+    operations: list = Field(
+        description=(
+            "List of operation dicts to apply to the user. Each dict is one operation.\n"
+            "Supported operations:\n"
+            "  $set — add/update non-channel properties:\n"
+            '    {"$set": {"name": "Alice", "$timezone": "America/New_York", "$locale": "es"}}\n'
+            "    System properties: $name (display name), $timezone (IANA tz), "
+            "$locale (language code e.g. 'en', 'es') — NEVER $preferred_language or $language.\n"
+            "    NEVER use $set for channel addresses — it does not work for channels.\n"
+            "  $unset — remove an entire channel or property:\n"
+            '    {"$unset": ["$email", "old_prop"]}\n'
+            "  $append — add one channel address (use the exact structure for each channel type):\n"
+            '    email:     {"$append": {"$email": "alice@example.com"}}\n'
+            '    sms:       {"$append": {"$sms": "+12025551234"}}\n'
+            '    whatsapp:  {"$append": {"$whatsapp": "+12025551234"}}\n'
+            '    inbox:     {"$append": {"$inbox": "inbox_id"}}\n'
+            '    androidpush: {"$append": {"$androidpush": "fcm_token"}}\n'
+            '    iospush:   {"$append": {"$iospush": "apns_token"}}\n'
+            '    webpush:   {"$append": {"$webpush": {"token": "...", "endpoint": "https://...", "keys": {"p256dh": "...", "auth": "..."}}}}\n'
+            "    slack — pick ONE format per entry:\n"
+            '      {"$append": {"$slack": {"email": "user@example.com", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"user_id": "UXXXXXXXX", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"channel": "CXXXXXXXX", "access_token": "xoxb-..."}}}\n'
+            '      {"$append": {"$slack": {"incoming_webhook": {"url": "https://hooks.slack.com/..."}}}}\n'
+            "    ms_teams — pick ONE format per entry:\n"
+            '      {"$append": {"$ms_teams": {"tenant_id": "...", "service_url": "https://...", "conversation_id": "..."}}}\n'
+            '      {"$append": {"$ms_teams": {"tenant_id": "...", "service_url": "https://...", "user_id": "..."}}}\n'
+            '      {"$append": {"$ms_teams": {"incoming_webhook": {"url": "https://wnk1z.webhook.office.com/..."}}}}\n'
+            "  $remove — remove one specific channel address (same structure as $append):\n"
+            '    {"$remove": {"$email": "old@example.com"}}\n'
+            "  $set_once — set immutable property:\n"
+            '    {"$set_once": {"first_seen": "2025-01-01"}}\n'
+            "  $increment — numeric delta:\n"
+            '    {"$increment": {"login_count": 1}}\n'
+            "Multiple operations can be combined in a single call.\n"
+            "IMPORTANT — to change/replace a channel address:\n"
+            '  use {"$unset": ["$email"]} + {"$append": {"$email": "new@example.com"}} in the same call.\n'
+            "  Never use $set, $add, or any other operation for channel updates."
+        ),
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+    @field_validator("operations", mode="before")
+    @classmethod
+    def parse_operations(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateUserTool(SuprSendTool):
+    """PATCH {base_url}/v1/user/{distinct_id}/"""
+
+    name = "update_user"
+    description = (
+        "Apply partial updates to an existing user profile using operations. "
+        "For non-channel properties use $set. "
+        "To add a channel address use $append. "
+        "To remove a specific channel address use $remove. "
+        "To remove an entire channel use $unset. "
+        "To CHANGE/REPLACE a channel address (e.g. update email, SMS): "
+        "combine $unset (remove the channel) + $append (add new address) in a single call. "
+        "NEVER use $set for channel addresses — it does not work for channels."
+    )
+    args_schema = UpdateUserInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        distinct_id: str = "",
+        operations: list = [],
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not distinct_id:
+            return "Error: distinct_id is required."
+        if not operations:
+            return "Error: operations list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.users.edit, distinct_id, {"operations": operations})
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating user '{distinct_id}'")
+
+
+# ── UpdateUserPreferenceCategoryTool ──────────────────────────────────────────
+
+_VALID_CHANNELS = ["email", "sms", "whatsapp", "androidpush", "iospush", "webpush", "inbox", "slack", "ms_teams"]
+_CHANNELS_DESC = ", ".join(f'"{c}"' for c in _VALID_CHANNELS)
+
+
+class UpdateUserPreferenceCategoryInput(BaseModel):
+    distinct_id: str = Field(description="Unique identifier of the user.")
+    category: str = Field(description="Preference category slug to update.")
+    preference: str = Field(
+        description='Opt-in/out decision for the category. Must be "opt_in" or "opt_out".',
+    )
+    opt_in_channels: list = Field(
+        default_factory=list,
+        description=(
+            f"Specific channels to opt into for this category. Valid values: {_CHANNELS_DESC}. "
+            "ONLY provide this when the user names particular channels (e.g. 'only email', 'email and SMS'). "
+            "If the user says 'all channels', 'everything', or does not specify channels — "
+            "OMIT this field entirely. Omitting means all channels. NEVER list every channel to mean 'all'."
+        ),
+    )
+    opt_out_channels: list = Field(
+        default_factory=list,
+        description=(
+            f"Specific channels to opt out of for this category. Valid values: {_CHANNELS_DESC}. "
+            "ONLY provide this when the user names particular channels (e.g. 'only SMS'). "
+            "If the user says 'all channels', 'everything', or does not specify channels — "
+            "OMIT this field entirely. Omitting means all channels. NEVER list every channel to mean 'all'."
+        ),
+    )
+    tenant_id: str = Field(
+        default="",
+        description="Tenant scope for the preference update. Omit for the global (default) tenant.",
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("opt_in_channels", "opt_out_channels", mode="before")
+    @classmethod
+    def parse_channels(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateUserPreferenceCategoryTool(SuprSendTool):
+    """PATCH {base_url}/v1/user/{distinct_id}/preference/category/{category}/"""
+
+    name = "update_user_preference_category"
+    description = (
+        "Update a user's opt-in or opt-out preference for a specific notification category. "
+        "Set preference to 'opt_in' or 'opt_out' for the category as a whole. "
+        "To apply to all channels omit opt_in_channels/opt_out_channels; to restrict to specific channels provide them. "
+        "Scope to a tenant with tenant_id to apply tenant-level preferences."
+    )
+    args_schema = UpdateUserPreferenceCategoryInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        distinct_id: str = "",
+        category: str = "",
+        preference: str = "",
+        opt_in_channels: list = [],
+        opt_out_channels: list = [],
+        tenant_id: str = "",
+        **kwargs,
+    ):
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not distinct_id:
+            return "Error: distinct_id is required."
+        if not category:
+            return "Error: category is required."
+        if preference not in ("opt_in", "opt_out"):
+            return "Error: preference must be 'opt_in' or 'opt_out'."
+        payload: dict = {"preference": preference}
+        if opt_in_channels:
+            payload["opt_in_channels"] = opt_in_channels
+        if opt_out_channels:
+            payload["opt_out_channels"] = opt_out_channels
+        options = {"tenant_id": tenant_id} if tenant_id else None
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.users.update_category_preference, distinct_id, category, payload, options
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating category preference for user '{distinct_id}'")
+
+
+# ── UpdateUserPreferenceChannelTool ───────────────────────────────────────────
+
+class UpdateUserPreferenceChannelInput(BaseModel):
+    distinct_id: str = Field(description="Unique identifier of the user.")
+    channel_preferences: list = Field(
+        description=(
+            f"List of channel preference objects. Each item must have: "
+            f'"channel" (one of {_CHANNELS_DESC}) and '
+            f'"is_restricted" (bool — true blocks the channel, false enables it).'
+        ),
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("channel_preferences", mode="before")
+    @classmethod
+    def parse_channel_preferences(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateUserPreferenceChannelTool(SuprSendTool):
+    """PATCH {base_url}/v1/user/{distinct_id}/preference/channel_preference/"""
+
+    name = "update_user_preference_channel"
+    description = (
+        "Update a user's overall channel-level notification preferences. "
+        "Set is_restricted=true to block a channel entirely for the user, false to enable it. "
+        "Multiple channels can be updated in a single call."
+    )
+    args_schema = UpdateUserPreferenceChannelInput
+    permission_category = "subscribers"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        distinct_id: str = "",
+        channel_preferences: list = [],
+        **kwargs,
+    ):
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not distinct_id:
+            return "Error: distinct_id is required."
+        if not channel_preferences:
+            return "Error: channel_preferences list is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.users.update_channel_preference,
+                distinct_id,
+                {"channel_preferences": channel_preferences},
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating channel preferences for user '{distinct_id}'")

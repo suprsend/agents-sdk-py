@@ -1,6 +1,9 @@
+import asyncio
 import yaml
 
-from pydantic import BaseModel, Field
+import json
+
+from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
@@ -45,12 +48,130 @@ class GetTranslationDetailsTool(ManagementTool):
         if not filename:
             return "Error: filename is required."
         try:
-            result = await self._mgmnt_run(
-                client,
-                lambda mgmt, **kw: mgmt.translations.get(kw.pop("workspace"), kw.pop("filename"), **kw),
-                workspace=ws,
-                filename=filename,
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.translations.get,
+                ws,
+                filename,
+                extra_headers=headers,
             )
-            return yaml.dump(result, default_flow_style=False)
+            return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
-            return f"Error fetching translation '{filename}' in workspace '{ws}': {e}"
+            return self._api_error(e, f"fetching translation '{filename}' in workspace '{ws}'")
+
+
+# ── UpdateTranslationTool ─────────────────────────────────────────────────────
+
+class UpdateTranslationInput(BaseModel):
+    filename: str = Field(
+        description="The translation filename to create or update (e.g. 'en_common.json').",
+    )
+    content: dict = Field(
+        description="Translation key-value pairs to store (e.g. {'greeting': 'Hello', 'farewell': 'Goodbye'}).",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def parse_content(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+
+class UpdateTranslationTool(ManagementTool):
+    """POST {mgmnt_url}/v1/{ws}/translation/content/{filename}/"""
+
+    name = "update_translation"
+    description = (
+        "Create or update a translation file for a workspace. "
+        "Provide the filename (e.g. 'en_common.json') and a dict of translation key-value pairs. "
+        "Use this to add or overwrite localized strings used in notification templates."
+    )
+    args_schema = UpdateTranslationInput
+    permission_subcategory = "translations"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        filename: str = "",
+        content: dict = {},
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not filename:
+            return "Error: filename is required."
+        if not content:
+            return "Error: content is required."
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.translations.upsert,
+                ws,
+                filename,
+                content,
+                extra_headers=headers,
+            )
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"updating translation '{filename}' in workspace '{ws}'")
+
+
+# ── CommitTranslationTool ─────────────────────────────────────────────────────
+
+class CommitTranslationInput(BaseModel):
+    commit_message: str = Field(
+        default="",
+        description="Description of the translation changes being committed. Optional but recommended.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CommitTranslationTool(ManagementTool):
+    """PATCH {mgmnt_url}/v1/{ws}/translation/commit/"""
+
+    name = "commit_translation"
+    description = (
+        "Commit the current translation draft to live. "
+        "Makes all pending translation file changes active. "
+        "Always call update_translation first to stage changes, then commit_translation to deploy them."
+    )
+    args_schema = CommitTranslationInput
+    permission_subcategory = "translations"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        commit_message: str = "",
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", None
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.translations.commit,
+                ws,
+                commit_message,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"committing translations in workspace '{ws}'")
