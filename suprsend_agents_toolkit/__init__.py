@@ -49,6 +49,12 @@ from suprsend_agents_toolkit.tools.management import (
     PushSchemaTool,
     CommitSchemaTool,
     LinkEventSchemaTool,
+    ValidateTemplateTool,
+    UpsertTemplateTool,
+    UpsertVariantContentTool,
+    ValidateVariantTool,
+    PreCommitValidateTemplateTool,
+    CommitTemplateTool,
 )
 from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
@@ -115,9 +121,13 @@ _ALL_TOOLS: dict[str, type] = {
     # events
     "validate_schema": ValidateSchemaTool,
     "track_event": TrackEventTool,
-    # coming soon:
-    # "guardrail":          GuardrailTool,          no permission (always included)
-    # "upsert_subscriber":  UpsertSubscriberTool,   permission_category="subscribers", operation="manage"
+    # templates
+    "validate_template": ValidateTemplateTool,
+    "upsert_template": UpsertTemplateTool,
+    "upsert_variant_content": UpsertVariantContentTool,
+    "validate_variant": ValidateVariantTool,
+    "pre_commit_validate_template": PreCommitValidateTemplateTool,
+    "commit_template": CommitTemplateTool,
 }
 
 
