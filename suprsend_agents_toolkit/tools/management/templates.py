@@ -1,13 +1,24 @@
 import asyncio
 import json
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Literal
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
 
 _CHANNELS = Literal["email", "sms", "whatsapp", "push", "inbox", "slack", "msteams", "webhook"]
+
+
+def _enforce_email_body(content: dict) -> dict:
+    """Raise if email content.body is a plain string instead of the required object."""
+    body = content.get("body")
+    if body is not None and isinstance(body, str):
+        raise ValueError(
+            "email content.body must be an object, not a plain string. "
+            'Use: {"type": "raw", "raw": {"html": "<p>your content</p>"}}'
+        )
+    return content
 
 
 # ── ValidateTemplateTool ──────────────────────────────────────────────────────
@@ -53,6 +64,20 @@ class ValidateTemplateInput(BaseModel):
             return json.loads(v)
         return v
 
+    @model_validator(mode="after")
+    def enforce_variant_content_shapes(self):
+        for i, variant in enumerate(self.variants):
+            if not isinstance(variant, dict):
+                continue
+            if variant.get("channel") == "email":
+                content = variant.get("content", {})
+                if isinstance(content, dict):
+                    try:
+                        _enforce_email_body(content)
+                    except ValueError as e:
+                        raise ValueError(f"variants[{i}]: {e}") from e
+        return self
+
     @field_validator("mock_data", mode="before")
     @classmethod
     def parse_mock_data(cls, v):
@@ -74,6 +99,8 @@ class ValidateTemplateTool(ManagementTool):
         "  - template_group.is_valid + errors: metadata validation\n"
         "  - variants[].is_valid + errors + rendered content: per-channel validation\n"
         "Always call this FIRST before any upsert calls. Only proceed to upsert_template if is_valid is true.\n\n"
+        "Email content shape — body must always be an object, never a plain string:\n"
+        '  {"subject": "Hello {{user.name}}", "body": {"type": "raw", "raw": {"html": "<p>Hi</p>"}}}\n\n'
         "mock_data validation behavior per channel:\n"
         "  - email, sms (standard), push, inbox, slack, msteams, webhook: mock_data is NOT validated — "
         "include it for rendering previews only, errors will never be raised against it.\n"
@@ -229,6 +256,12 @@ class UpsertVariantContentInput(BaseModel):
             return json.loads(v)
         return v
 
+    @model_validator(mode="after")
+    def enforce_content_shape(self):
+        if self.channel == "email":
+            _enforce_email_body(self.content)
+        return self
+
 
 class UpsertVariantContentTool(ManagementTool):
     """PATCH {mgmnt_url}/v2/{ws}/template/{slug}/channel/{channel}/variant/{variant_id}/content/"""
@@ -237,12 +270,19 @@ class UpsertVariantContentTool(ManagementTool):
     description = (
         "Set or update channel-specific content for a template variant. "
         "Call once per channel. variant_id defaults to 'default' for the primary variant.\n\n"
-        "Content shape per channel:\n"
-        "  email:   {subject, body: {type: 'raw', raw: {html}}}\n"
-        "  sms:     {text} for standard, or {type: 'dlt', body, sender_id, template_id} for DLT/approval\n"
-        "  whatsapp:{category, body: {text}, header: {format, text|media_url}, footer: {text}, button_type}\n"
-        "  push:    {title, body}\n"
-        "For SMS DLT or WhatsApp, set needs_vendor_approval=true in validate_template."
+        "Content shape per channel — pass exactly as shown:\n\n"
+        "  email:\n"
+        '    {"subject": "Hello {{user.name}}", "body": {"type": "raw", "raw": {"html": "<p>Hi {{user.name}}</p>"}}}\n'
+        "  IMPORTANT: email body must always be an object {type, raw} — never a plain string.\n\n"
+        "  sms (standard):\n"
+        '    {"text": "Your OTP is {{otp}}"}\n\n'
+        "  sms (DLT/approval — needs_vendor_approval=true in validate_template):\n"
+        '    {"type": "dlt", "body": "Your OTP is {{otp}}", "sender_id": "ABCDEF", "template_id": "1007xxxxxxxxxx"}\n\n'
+        "  whatsapp:\n"
+        '    {"category": "UTILITY", "body": {"text": "Hello {{user.name}}"}, '
+        '"header": {"format": "TEXT", "text": "Order {{order.id}}"}, "footer": {"text": "Thank you"}, "button_type": "NONE"}\n\n'
+        "  push:\n"
+        '    {"title": "New message", "body": "You have {{count}} unread messages"}\n'
     )
     args_schema = UpsertVariantContentInput
     permission_subcategory = "templates"
