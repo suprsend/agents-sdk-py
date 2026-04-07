@@ -12,11 +12,163 @@ class TemplatesApi(BaseApi):
     Management API callers for v2/{ws}/template/ endpoints.
     """
 
-    def _url(self, workspace: str, template_slug: str) -> str:
-        return (
-            f"{self.config.base_url}/v2/{quote(workspace, safe='')}/"
-            f"template/{quote(template_slug, safe='')}/"
+    def _url(self, workspace: str, template_slug: str | None = None) -> str:
+        base = f"{self.config.base_url}/v2/{quote(workspace, safe='')}/template/"
+        if template_slug:
+            return f"{base}{quote(template_slug, safe='')}/"
+        return base
+
+    def list(
+        self,
+        workspace: str,
+        search: str | None = None,
+        slugs: list[str] | None = None,
+        mode: str = "draft",
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """GET /v2/{ws}/template/"""
+        params: dict = {"mode": mode}
+        if search:
+            params["search"] = search
+        if slugs:
+            params["slugs"] = ",".join(slugs)
+        if order_by:
+            params["order_by"] = order_by
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        resp = requests.get(
+            self._url(workspace),
+            headers=self._headers(extra_headers),
+            params=params,
+            timeout=_DEFAULT_TIMEOUT,
         )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def get(
+        self,
+        workspace: str,
+        template_slug: str,
+        mode: str = "draft",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """GET /v2/{ws}/template/{slug}/"""
+        resp = requests.get(
+            self._url(workspace, template_slug),
+            headers=self._headers(extra_headers),
+            params={"mode": mode},
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def list_variants(
+        self,
+        workspace: str,
+        template_slug: str,
+        mode: str = "draft",
+        channel: str | None = None,
+        include_content: bool = False,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """GET /v2/{ws}/template/{slug}/variant/"""
+        params: dict = {"mode": mode}
+        if channel:
+            params["channel[]"] = channel
+        if include_content:
+            params["include_content"] = "true"
+        resp = requests.get(
+            self._url(workspace, template_slug) + "variant/",
+            headers=self._headers(extra_headers),
+            params=params,
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def get_variant_content(
+        self,
+        workspace: str,
+        template_slug: str,
+        channel: str,
+        variant_id: str = "default",
+        mode: str = "draft",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """GET /v2/{ws}/template/{slug}/channel/{channel}/variant/{variant_id}/content/"""
+        url = (
+            self._url(workspace, template_slug)
+            + f"channel/{quote(channel, safe='')}/variant/{quote(variant_id, safe='')}/content/"
+        )
+        resp = requests.get(
+            url,
+            headers=self._headers(extra_headers),
+            params={"mode": mode},
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def list_versions(
+        self,
+        workspace: str,
+        template_slug: str,
+        extra_headers: dict | None = None,
+    ) -> list:
+        """GET /v2/{ws}/template/{slug}/version/"""
+        resp = requests.get(
+            self._url(workspace, template_slug) + "version/",
+            headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def get_mock_data(
+        self,
+        workspace: str,
+        template_slug: str,
+        mode: str = "draft",
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """GET /v2/{ws}/template/{slug}/mock_data/"""
+        resp = requests.get(
+            self._url(workspace, template_slug) + "mock_data/",
+            headers=self._headers(extra_headers),
+            params={"mode": mode},
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
+    def update_mock_data(
+        self,
+        workspace: str,
+        template_slug: str,
+        data: dict,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """PATCH /v2/{ws}/template/{slug}/mock_data/"""
+        resp = requests.patch(
+            self._url(workspace, template_slug) + "mock_data/",
+            headers=self._headers(extra_headers),
+            json={"data": data},
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
 
     def validate(
         self,

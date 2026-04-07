@@ -35,6 +35,401 @@ def _normalize_email_content(content: dict) -> dict:
     return content
 
 
+# ── ListTemplatesTool ─────────────────────────────────────────────────────────
+
+class ListTemplatesInput(BaseModel):
+    search: str | None = Field(default=None, description="Text search on template name, slug, or description.")
+    slugs: list[str] | None = Field(default=None, description="Filter to specific template slugs.")
+    mode: Literal["draft", "live"] = Field(default="draft", description="'draft' returns in-progress version; 'live' returns only templates with a published version.")
+    order_by: str | None = Field(default=None, description="Sort order: last_triggered_at, updated_at, -last_triggered_at, -updated_at.")
+    limit: int | None = Field(default=None, description="Maximum number of results (max 50).")
+    offset: int | None = Field(default=None, description="Number of results to skip for pagination.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("slugs", mode="before")
+    @classmethod
+    def parse_slugs(cls, v):
+        return _parse_if_str(v)
+
+
+class ListTemplatesTool(ManagementTool):
+    """GET {mgmnt_url}/v2/{ws}/template/"""
+
+    name = "list_templates"
+    description = (
+        "List templates in the workspace. Supports text search, slug filtering, and pagination. "
+        "Use mode='draft' (default) to see all templates including unpublished ones, "
+        "or mode='live' to see only templates with a published version."
+    )
+    args_schema = ListTemplatesInput
+    permission_subcategory = "templates"
+    permission_operation = "view"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        search: str | None = None,
+        slugs: list | None = None,
+        mode: str = "draft",
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.list,
+                ws,
+                search=search,
+                slugs=slugs,
+                mode=mode,
+                order_by=order_by,
+                limit=limit,
+                offset=offset,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, "listing templates")
+
+
+# ── GetTemplateTool ───────────────────────────────────────────────────────────
+
+class GetTemplateInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template to fetch.")
+    mode: Literal["draft", "live"] = Field(default="draft", description="'draft' returns the in-progress version; 'live' returns the last published version.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class GetTemplateTool(ManagementTool):
+    """GET {mgmnt_url}/v2/{ws}/template/{slug}/"""
+
+    name = "get_template"
+    description = (
+        "Fetch a single template by slug. Returns metadata, enabled channels, version info, "
+        "and validation_result. Use mode='draft' (default) to inspect the current draft, "
+        "or mode='live' to see the last published version. Returns 404 if slug not found "
+        "or if mode='live' and no live version exists."
+    )
+    args_schema = GetTemplateInput
+    permission_subcategory = "templates"
+    permission_operation = "view"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        mode: str = "draft",
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not template_slug:
+            return "Error: template_slug is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.get,
+                ws,
+                template_slug,
+                mode=mode,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"fetching template '{template_slug}'")
+
+
+# ── GetTemplateVariantsTool ───────────────────────────────────────────────────
+
+class GetTemplateVariantsInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template.")
+    mode: Literal["draft", "live"] = Field(default="draft", description="Which version to read from.")
+    channel: str | None = Field(default=None, description="Filter to a specific channel (email, sms, whatsapp, push, inbox, slack, msteams, webhook).")
+    include_content: bool = Field(default=False, description="Include full channel content in each variant. Omit for summary-only (faster).")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class GetTemplateVariantsTool(ManagementTool):
+    """GET {mgmnt_url}/v2/{ws}/template/{slug}/variant/"""
+
+    name = "get_template_variants"
+    description = (
+        "List all variants for a template across channels. Optionally filter by channel. "
+        "Set include_content=true to fetch full content inline (expensive for many variants — "
+        "prefer get_variant_content for a single variant). "
+        "Ordered by channel rank → tenant_id (nulls first) → seq_no."
+    )
+    args_schema = GetTemplateVariantsInput
+    permission_subcategory = "templates"
+    permission_operation = "view"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        mode: str = "draft",
+        channel: str | None = None,
+        include_content: bool = False,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not template_slug:
+            return "Error: template_slug is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.list_variants,
+                ws,
+                template_slug,
+                mode=mode,
+                channel=channel,
+                include_content=include_content,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"fetching variants for template '{template_slug}'")
+
+
+# ── GetVariantContentTool ─────────────────────────────────────────────────────
+
+class GetVariantContentInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template.")
+    channel: _CHANNELS = Field(description="Channel to fetch content for.")
+    variant_id: str = Field(default="default", description="Variant identifier. Defaults to 'default'.")
+    mode: Literal["draft", "live"] = Field(default="draft", description="Which version to read from.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class GetVariantContentTool(ManagementTool):
+    """GET {mgmnt_url}/v2/{ws}/template/{slug}/channel/{channel}/variant/{variant_id}/content/"""
+
+    name = "get_variant_content"
+    description = (
+        "Fetch the full content for a specific template variant (channel + variant_id). "
+        "Returns the variant object with content and internal_content populated. "
+        "For email, body will be the full email_body_def structure, not a plain string. "
+        "Use this before modifying a variant to see what's currently saved."
+    )
+    args_schema = GetVariantContentInput
+    permission_subcategory = "templates"
+    permission_operation = "view"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        channel: str = "",
+        variant_id: str = "default",
+        mode: str = "draft",
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not template_slug:
+            return "Error: template_slug is required.", {}
+        if not channel:
+            return "Error: channel is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.get_variant_content,
+                ws,
+                template_slug,
+                channel,
+                variant_id=variant_id,
+                mode=mode,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"fetching variant content for '{template_slug}' channel '{channel}'")
+
+
+# ── GetTemplateVersionsTool ───────────────────────────────────────────────────
+
+class GetTemplateVersionsInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class GetTemplateVersionsTool(ManagementTool):
+    """GET {mgmnt_url}/v2/{ws}/template/{slug}/version/"""
+
+    name = "get_template_versions"
+    description = (
+        "List published versions of a template ordered by version_no descending. "
+        "Returns only published (active + inactive) versions — never draft. "
+        "Each version includes: version_no, status, hash, commit_message, active_at, channels, variant summary."
+    )
+    args_schema = GetTemplateVersionsInput
+    permission_subcategory = "templates"
+    permission_operation = "view"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        **kwargs,
+    ) -> tuple[str, list]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", []
+        if not template_slug:
+            return "Error: template_slug is required.", []
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.list_versions,
+                ws,
+                template_slug,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"fetching versions for template '{template_slug}'")
+
+
+# ── GetMockDataTool ───────────────────────────────────────────────────────────
+
+class GetMockDataInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template.")
+    mode: Literal["draft", "live"] = Field(default="draft", description="Which version's mock data to fetch.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+
+class GetMockDataTool(ManagementTool):
+    """GET {mgmnt_url}/v2/{ws}/template/{slug}/mock_data/"""
+
+    name = "get_mock_data"
+    description = (
+        "Fetch the mock data for a template. Mock data provides test values for template variables "
+        "used during validate_template and validate_variant calls. "
+        "The payload field under data holds handlebars variables — {{user.name}} maps to data.payload.user.name. "
+        "Returns an initialized empty object if no mock data has been set yet (not an error)."
+    )
+    args_schema = GetMockDataInput
+    permission_subcategory = "templates"
+    permission_operation = "view"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        mode: str = "draft",
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not template_slug:
+            return "Error: template_slug is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.get_mock_data,
+                ws,
+                template_slug,
+                mode=mode,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"fetching mock data for template '{template_slug}'")
+
+
+# ── UpdateMockDataTool ────────────────────────────────────────────────────────
+
+class UpdateMockDataInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template.")
+    data: dict = Field(
+        description=(
+            "Mock data object. Key field is 'payload' — it holds the handlebars variables: "
+            '{"payload": {"user": {"name": "Alice"}, "order": {"id": "ORD-123"}}, '
+            '"recipient_distinct_id": "user-123"}. '
+            "Other optional fields: tenant_id, is_batch, batch_count, recipient_sub_type, actor_*."
+        )
+    )
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def parse_data(cls, v):
+        return _parse_if_str(v)
+
+
+class UpdateMockDataTool(ManagementTool):
+    """PATCH {mgmnt_url}/v2/{ws}/template/{slug}/mock_data/"""
+
+    name = "update_mock_data"
+    description = (
+        "Update the draft mock data for a template. Mock data is shared across all channels "
+        "and used by validate_template and validate_variant for variable rendering. "
+        "Only the draft version's mock data can be edited. "
+        "The payload field under data is what feeds handlebars variable substitution."
+    )
+    args_schema = UpdateMockDataInput
+    permission_subcategory = "templates"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        data: dict = None,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not template_slug:
+            return "Error: template_slug is required.", {}
+        if not data:
+            return "Error: data is required.", {}
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.update_mock_data,
+                ws,
+                template_slug,
+                data,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"updating mock data for template '{template_slug}'")
+
+
 # ── ValidateTemplateTool ──────────────────────────────────────────────────────
 
 class ValidateTemplateVariantInput(BaseModel):
