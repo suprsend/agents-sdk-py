@@ -10,14 +10,28 @@ from suprsend_agents_toolkit.core.management import ManagementTool
 _CHANNELS = Literal["email", "sms", "whatsapp", "push", "inbox", "slack", "msteams", "webhook"]
 
 
-def _enforce_email_body(content: dict) -> dict:
-    """Raise if email content.body is a plain string instead of the required object."""
+def _parse_if_str(v):
+    """Parse a JSON string into a Python object if needed."""
+    if isinstance(v, str):
+        return json.loads(v)
+    return v
+
+
+def _normalize_email_content(content: dict) -> dict:
+    """
+    Ensure email content.body is a dict.
+    If body is a JSON-encoded string, parse it automatically.
+    If body is a plain non-JSON string, raise a clear error.
+    """
     body = content.get("body")
     if body is not None and isinstance(body, str):
-        raise ValueError(
-            "email content.body must be an object, not a plain string. "
-            'Use: {"type": "raw", "raw": {"html": "<p>your content</p>"}}'
-        )
+        try:
+            content["body"] = json.loads(body)
+        except (json.JSONDecodeError, ValueError):
+            raise ValueError(
+                "email content.body must be an object, not a plain string. "
+                'Use: {"type": "raw", "raw": {"html": "<p>your content</p>"}}'
+            )
     return content
 
 
@@ -33,9 +47,7 @@ class ValidateTemplateVariantInput(BaseModel):
     @field_validator("content", mode="before")
     @classmethod
     def parse_content(cls, v):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
+        return _parse_if_str(v)
 
 
 class ValidateTemplateInput(BaseModel):
@@ -60,20 +72,25 @@ class ValidateTemplateInput(BaseModel):
     @field_validator("enabled_channels", "tags", "variants", mode="before")
     @classmethod
     def parse_list_fields(cls, v):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
+        return _parse_if_str(v)
 
     @model_validator(mode="after")
     def enforce_variant_content_shapes(self):
         for i, variant in enumerate(self.variants):
             if not isinstance(variant, dict):
                 continue
+            # parse nested string fields inside each variant
+            for key in ("content", "mock_data"):
+                if key in variant and isinstance(variant[key], str):
+                    try:
+                        variant[key] = json.loads(variant[key])
+                    except (json.JSONDecodeError, ValueError):
+                        pass
             if variant.get("channel") == "email":
                 content = variant.get("content", {})
                 if isinstance(content, dict):
                     try:
-                        _enforce_email_body(content)
+                        variant["content"] = _normalize_email_content(content)
                     except ValueError as e:
                         raise ValueError(f"variants[{i}]: {e}") from e
         return self
@@ -81,9 +98,7 @@ class ValidateTemplateInput(BaseModel):
     @field_validator("mock_data", mode="before")
     @classmethod
     def parse_mock_data(cls, v):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
+        return _parse_if_str(v)
 
 
 class ValidateTemplateTool(ManagementTool):
@@ -180,10 +195,7 @@ class UpsertTemplateInput(BaseModel):
     @field_validator("enabled_channels", "tags", mode="before")
     @classmethod
     def parse_list(cls, v):
-        if isinstance(v, str):
-            import json
-            return json.loads(v)
-        return v
+        return _parse_if_str(v)
 
 
 class UpsertTemplateTool(ManagementTool):
@@ -252,14 +264,12 @@ class UpsertVariantContentInput(BaseModel):
     @field_validator("content", mode="before")
     @classmethod
     def parse_content(cls, v):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
+        return _parse_if_str(v)
 
     @model_validator(mode="after")
     def enforce_content_shape(self):
         if self.channel == "email":
-            _enforce_email_body(self.content)
+            self.content = _normalize_email_content(self.content)
         return self
 
 
@@ -340,9 +350,7 @@ class ValidateVariantInput(BaseModel):
     @field_validator("content", "mock_data", mode="before")
     @classmethod
     def parse_dict(cls, v):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
+        return _parse_if_str(v)
 
 
 class ValidateVariantTool(ManagementTool):
@@ -463,6 +471,11 @@ class CommitTemplateInput(BaseModel):
     )
     commit_message: str = Field(default="", description="Optional message describing what changed.")
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("variants", mode="before")
+    @classmethod
+    def parse_variants(cls, v):
+        return _parse_if_str(v)
 
 
 class CommitTemplateTool(ManagementTool):
