@@ -46,6 +46,13 @@ class ValidateTemplateInput(BaseModel):
     )
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
 
+    @field_validator("enabled_channels", "tags", "variants", mode="before")
+    @classmethod
+    def parse_list_fields(cls, v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
     @field_validator("mock_data", mode="before")
     @classmethod
     def parse_mock_data(cls, v):
@@ -142,6 +149,14 @@ class UpsertTemplateInput(BaseModel):
         ),
     )
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("enabled_channels", "tags", mode="before")
+    @classmethod
+    def parse_list(cls, v):
+        if isinstance(v, str):
+            import json
+            return json.loads(v)
+        return v
 
 
 class UpsertTemplateTool(ManagementTool):
