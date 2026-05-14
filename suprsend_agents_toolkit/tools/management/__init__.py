@@ -1,3 +1,4 @@
+from suprsend_agents_toolkit.tools.management.test_runs import DraftTriggerWorkflowTool, TestTemplateTool
 from suprsend_agents_toolkit.tools.management.preference_categories import GetPreferenceCategoriesTool, UpdatePreferenceCategoryTool
 from suprsend_agents_toolkit.tools.management.workflows import ListWorkflowsTool, GetWorkflowTool, ValidateWorkflowTool, PushWorkflowTool, CommitWorkflowTool
 from suprsend_agents_toolkit.tools.management.events import GetEventDetailsTool
@@ -20,6 +21,8 @@ from suprsend_agents_toolkit.tools.management.templates import (
 )
 
 __all__ = [
+    "DraftTriggerWorkflowTool",
+    "TestTemplateTool",
     "GetPreferenceCategoriesTool",
     "UpdatePreferenceCategoryTool",
     "ListWorkflowsTool",

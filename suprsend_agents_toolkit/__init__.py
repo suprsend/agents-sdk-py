@@ -33,6 +33,8 @@ from suprsend_agents_toolkit.tools.tenants import (
     UpdateTenantPreferenceCategoryTool,
 )
 from suprsend_agents_toolkit.tools.management import (
+    DraftTriggerWorkflowTool,
+    TestTemplateTool,
     GetPreferenceCategoriesTool,
     UpdatePreferenceCategoryTool,
     ListWorkflowsTool,
@@ -128,6 +130,9 @@ _ALL_TOOLS: dict[str, type] = {
     # events
     "validate_schema": ValidateSchemaTool,
     "track_event": TrackEventTool,
+    # test runs
+    "draft_trigger_workflow": DraftTriggerWorkflowTool,
+    "test_template": TestTemplateTool,
     # templates
     "list_templates": ListTemplatesTool,
     "get_template": GetTemplateTool,
