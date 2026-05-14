@@ -64,6 +64,7 @@ class SuprSendTool(ABC):
     destructive: bool = False # can permanently delete or overwrite data
     idempotent: bool = True   # repeated identical calls produce the same result
     open_world: bool = True   # may return data that changes between calls
+    strip_artifact: bool = False  # when True, ToolMessage.artifact is never set
 
     def __init__(self, client: Any) -> None:
         self._client = client  # AsyncSuprSendClient
@@ -196,10 +197,30 @@ class SuprSendTool(ABC):
         Return a LangChain StructuredTool.
         run_config: RunnableConfig is injected by LangGraph at every call,
         enabling the JWT swap without changes in execute().
+        When strip_artifact=True the ToolMessage.artifact is never set —
+        identical to strip_artifact=True in kai's _inject_workspace wrapper.
         """
         from langchain_core.tools import StructuredTool
 
         tool_self = self
+
+        if self.strip_artifact:
+            async def _run_no_artifact(run_config: RunnableConfig, **kwargs: Any) -> str:
+                client = tool_self._resolve_client(run_config)
+                tool_self._enforce_policy(client)
+                try:
+                    result = await tool_self.execute(client=client, **kwargs)
+                    return result[0] if isinstance(result, tuple) else result
+                finally:
+                    if client is not tool_self._client:
+                        await client.close()
+
+            return StructuredTool.from_function(
+                coroutine=_run_no_artifact,
+                name=self.name,
+                description=self.description,
+                args_schema=self.args_schema,
+            )
 
         async def _run(run_config: RunnableConfig, **kwargs: Any) -> "tuple[str, Any]":
             client = tool_self._resolve_client(run_config)

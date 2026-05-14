@@ -229,6 +229,7 @@ class SuprSendToolkit:
         jwt_getter: "Callable[[Any], str] | None" = None,
         allow_writes: bool = True,
         allow_destructive: bool = True,
+        strip_artifact_tools: "set[str] | frozenset[str] | None" = None,
     ) -> None:
         if auth:
             _auth = auth
@@ -243,6 +244,7 @@ class SuprSendToolkit:
         _policy = {"allow_writes": allow_writes, "allow_destructive": allow_destructive}
         self._client = AsyncSuprSendClient(auth=_auth, context=_ctx, jwt_getter=jwt_getter, policy=_policy)
         self._permissions = permissions
+        self._strip_artifact_tools: frozenset[str] = frozenset(strip_artifact_tools or [])
 
     def _permitted_names(self, requested: list[str] | None) -> list[str]:
         """Names from the requested list (or all) that pass the permission check."""
@@ -260,7 +262,10 @@ class SuprSendToolkit:
         ]
 
     def _instantiate(self, name: str) -> object:
-        return _ALL_TOOLS[name](client=self._client)
+        instance = _ALL_TOOLS[name](client=self._client)
+        if name in self._strip_artifact_tools:
+            instance.strip_artifact = True
+        return instance
 
     def _builtin_instances(self) -> list:
         return [cls(client=self._client) for cls in _BUILTIN_TOOLS.values()]
