@@ -242,6 +242,36 @@ class TemplatesApi(BaseApi):
             raise SuprsendManagementException(resp)
         return resp.json()
 
+    def upsert_variant(
+        self,
+        workspace: str,
+        template_slug: str,
+        channel: str,
+        variant_id: str,
+        payload: dict,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        """
+        POST /v2/{ws}/template/{slug}/channel/{channel}/variant/{variant_id}/
+        Create or update a variant. Creates the variant record if variant_id does not exist;
+        updates it if found. Required: locale. Optional: tenant_id, conditions,
+        needs_vendor_approval, content.
+        Returns 201 for create, 202 for update.
+        """
+        url = (
+            self._url(workspace, template_slug)
+            + f"channel/{quote(channel, safe='')}/variant/{quote(variant_id, safe='')}/"
+        )
+        resp = requests.post(
+            url,
+            headers=self._headers(extra_headers),
+            json=payload,
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise SuprsendManagementException(resp)
+        return resp.json()
+
     def validate_variant(
         self,
         workspace: str,

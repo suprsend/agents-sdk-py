@@ -739,6 +739,115 @@ class UpsertVariantContentTool(ManagementTool):
             return self._api_error(e, f"upserting variant content for '{template_slug}' channel '{channel}'")
 
 
+# ── UpsertVariantTool ─────────────────────────────────────────────────────────
+
+class UpsertVariantInput(BaseModel):
+    template_slug: str = Field(description="Slug of the template.")
+    channel: _CHANNELS = Field(description="Channel for this variant.")
+    variant_id: str = Field(description="Variant identifier in the URL (e.g. 'default-fr', 'tenant-acme'). Must be unique within the channel.")
+    locale: str = Field(description="BCP 47 locale code (e.g. 'en', 'fr', 'en-US'). Required for creation.")
+    content: dict | None = Field(default=None, description="Channel-specific content object. Same shape as upsert_variant_content. Optional — can be set later via upsert_variant_content.")
+    tenant_id: str | None = Field(default=None, description="Tenant identifier for tenant-scoped variants. Pass null for global variants.")
+    conditions: list | None = Field(default=None, description="Targeting conditions for conditional variants. Pass [] for unconditional variants.")
+    needs_vendor_approval: bool | None = Field(default=None, description="Set True for SMS DLT or WhatsApp templates requiring vendor approval.")
+    workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def parse_content(cls, v):
+        return _parse_if_str(v) if v is not None else v
+
+    @field_validator("conditions", mode="before")
+    @classmethod
+    def parse_conditions(cls, v):
+        return _parse_if_str(v) if v is not None else v
+
+    @model_validator(mode="after")
+    def enforce_content_shape(self):
+        if self.content is not None and self.channel == "email":
+            self.content = _normalize_email_content(self.content)
+        return self
+
+
+class UpsertVariantTool(ManagementTool):
+    """POST {mgmnt_url}/v2/{ws}/template/{slug}/channel/{channel}/variant/{variant_id}/"""
+
+    name = "upsert_variant"
+    description = (
+        "Create or update a template variant. Use this when you need to add a NEW variant "
+        "that does not exist yet (e.g. a French locale variant 'default-fr', or a tenant-scoped "
+        "variant). Also use this to update an existing variant's locale, conditions, or "
+        "needs_vendor_approval alongside its content in one call.\n\n"
+        "Key distinction from upsert_variant_content:\n"
+        "  - upsert_variant_content: PATCH — updates content of an EXISTING variant (404 if variant_id not found)\n"
+        "  - upsert_variant (this tool): POST — creates variant if not found, updates if found. "
+        "Always safe to call for new variant IDs.\n\n"
+        "variant_id is the URL-level identifier (e.g. 'default', 'default-fr', 'tenant-acme-en'). "
+        "locale determines the language (e.g. 'en', 'fr'). For the 'default' variant, "
+        "locale and tenant_id cannot be changed after creation.\n\n"
+        "Content shape per channel (same as upsert_variant_content):\n"
+        "  email: {\"subject\": \"Hello {{user.name}}\", \"body\": {\"type\": \"raw\", \"raw\": {\"html\": \"<p>Hi</p>\"}}}\n"
+        "  sms:   {\"text\": \"Your OTP is {{otp}}\"}\n"
+        "  whatsapp: {\"category\": \"UTILITY\", \"body\": {\"text\": \"Hello {{name}}\"}}\n"
+        "  androidpush/iospush: {\"title\": \"...\", \"body\": \"...\"}\n"
+        "  webpush: {\"title\": \"...\", \"body\": \"...\", \"url\": \"https://...\"}\n"
+    )
+    args_schema = UpsertVariantInput
+    permission_subcategory = "templates"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        template_slug: str = "",
+        channel: str = "",
+        variant_id: str = "",
+        locale: str = "",
+        content: dict | None = None,
+        tenant_id: str | None = None,
+        conditions: list | None = None,
+        needs_vendor_approval: bool | None = None,
+        **kwargs,
+    ) -> tuple[str, dict]:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required.", {}
+        if not template_slug:
+            return "Error: template_slug is required.", {}
+        if not channel:
+            return "Error: channel is required.", {}
+        if not variant_id:
+            return "Error: variant_id is required.", {}
+        if not locale:
+            return "Error: locale is required.", {}
+        payload: dict = {"locale": locale}
+        if tenant_id is not None:
+            payload["tenant_id"] = tenant_id
+        if conditions is not None:
+            payload["conditions"] = conditions
+        if needs_vendor_approval is not None:
+            payload["needs_vendor_approval"] = needs_vendor_approval
+        if content is not None:
+            payload["content"] = content
+        try:
+            mgmt, headers = self._mgmnt(client)
+            result = await asyncio.to_thread(
+                mgmt.templates.upsert_variant,
+                ws,
+                template_slug,
+                channel,
+                variant_id,
+                payload,
+                extra_headers=headers,
+            )
+            return json.dumps(result), result
+        except Exception as e:
+            return self._api_error(e, f"upserting variant '{variant_id}' for '{template_slug}' channel '{channel}'")
+
+
 # ── ValidateVariantTool ───────────────────────────────────────────────────────
 
 class ValidateVariantInput(BaseModel):
