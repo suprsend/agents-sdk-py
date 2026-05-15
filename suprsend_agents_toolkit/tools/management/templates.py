@@ -7,7 +7,7 @@ from typing import Literal
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
 
-_CHANNELS = Literal["email", "sms", "whatsapp", "androidpush", "iospush", "webpush", "inbox", "slack", "msteams", "webhook"]
+_CHANNELS = Literal["email", "sms", "whatsapp", "androidpush", "iospush", "webpush", "inbox", "slack", "ms_teams", "webhook"]
 
 
 def _parse_if_str(v):
