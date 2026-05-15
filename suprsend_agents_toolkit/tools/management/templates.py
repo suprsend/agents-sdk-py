@@ -7,7 +7,7 @@ from typing import Literal
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
 
-_CHANNELS = Literal["email", "sms", "whatsapp", "push", "inbox", "slack", "msteams", "webhook"]
+_CHANNELS = Literal["email", "sms", "whatsapp", "androidpush", "iospush", "webpush", "inbox", "slack", "msteams", "webhook"]
 
 
 def _parse_if_str(v):
@@ -156,7 +156,7 @@ class GetTemplateTool(ManagementTool):
 class GetTemplateVariantsInput(BaseModel):
     template_slug: str = Field(description="Slug of the template.")
     mode: Literal["draft", "live"] = Field(default="draft", description="Which version to read from.")
-    channel: str | None = Field(default=None, description="Filter to a specific channel (email, sms, whatsapp, push, inbox, slack, msteams, webhook).")
+    channel: str | None = Field(default=None, description="Filter to a specific channel (email, sms, whatsapp, androidpush, iospush, webpush, inbox, slack, msteams, webhook).")
     include_content: bool = Field(default=False, description="Include full channel content in each variant. Omit for summary-only (faster).")
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
 
@@ -512,7 +512,7 @@ class ValidateTemplateTool(ManagementTool):
         "Email content shape — body must always be an object, never a plain string:\n"
         '  {"subject": "Hello {{user.name}}", "body": {"type": "raw", "raw": {"html": "<p>Hi</p>"}}}\n\n'
         "mock_data validation behavior per channel:\n"
-        "  - email, sms (standard), push, inbox, slack, msteams, webhook: mock_data is NOT validated — "
+        "  - email, sms (standard), androidpush, iospush, webpush, inbox, slack, msteams, webhook: mock_data is NOT validated — "
         "include it for rendering previews only, errors will never be raised against it.\n"
         "  - sms (DLT, needs_vendor_approval=true): mock_data IS validated — empty rendered variables "
         "raise errors on body.\n"
@@ -582,7 +582,7 @@ class UpsertTemplateInput(BaseModel):
         default_factory=list,
         description=(
             "Channels this template supports. Accepted values: "
-            "email, sms, whatsapp, push, inbox, slack, msteams, webhook."
+            "email, sms, whatsapp, androidpush, iospush, webpush, inbox, slack, msteams, webhook."
         ),
     )
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
@@ -686,8 +686,17 @@ class UpsertVariantContentTool(ManagementTool):
         "  whatsapp:\n"
         '    {"category": "UTILITY", "body": {"text": "Hello {{user.name}}"}, '
         '"header": {"format": "TEXT", "text": "Order {{order.id}}"}, "footer": {"text": "Thank you"}, "button_type": "NONE"}\n\n'
-        "  push:\n"
-        '    {"title": "New message", "body": "You have {{count}} unread messages"}\n'
+        "  androidpush:\n"
+        '    {"title": "New message", "body": "You have {{count}} unread messages",\n'
+        '     "data": {}, "url": "deeplink://...", "image": "https://...",\n'
+        '     "buttons": [{"id": "btn1", "label": "View", "url": "..."}]}\n'
+        "  (data, url, image, buttons are optional)\n\n"
+        "  iospush:\n"
+        '    {"title": "New message", "body": "You have {{count}} unread messages",\n'
+        '     "data": {}, "url": "deeplink://...", "badge": 1, "sound": "default"}\n'
+        "  (data, url, badge, sound are optional)\n\n"
+        "  webpush:\n"
+        '    {"title": "New message", "body": "You have {{count}} unread messages", "url": "https://..."}\n'
     )
     args_schema = UpsertVariantContentInput
     permission_subcategory = "templates"
