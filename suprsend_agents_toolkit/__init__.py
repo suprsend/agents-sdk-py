@@ -70,6 +70,7 @@ from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFro
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
 from suprsend_agents_toolkit.tools.validate_schema import ValidateSchemaTool
+from suprsend_agents_toolkit.tools.validate_json_jsonnet import ValidateJsonJsonnetTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 
@@ -130,6 +131,7 @@ _ALL_TOOLS: dict[str, type] = {
     "trigger_workflow": TriggerWorkflowTool,
     # events
     "validate_schema": ValidateSchemaTool,
+    "validate_json_jsonnet": ValidateJsonJsonnetTool,
     "track_event": TrackEventTool,
     # test runs
     "draft_trigger_workflow": DraftTriggerWorkflowTool,
