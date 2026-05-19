@@ -174,13 +174,14 @@ class WorkflowsApi(BaseApi):
         PATCH /v1/{workspace}/workflow/{slug}/commit/
         Promotes the saved draft to live. Lightweight — no workflow JSON needed.
         """
-        body = {}
+        params = {}
         if commit_message:
-            body["commit_message"] = commit_message
+            params["commit_message"] = commit_message
         resp = requests.patch(
             self._url(workspace, workflow_slug) + "commit/",
             headers=self._headers(extra_headers),
-            json=body,
+            params=params or None,
+            json={},
             timeout=_DEFAULT_TIMEOUT,
         )
         if resp.status_code >= 400:

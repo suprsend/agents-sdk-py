@@ -33,6 +33,8 @@ from suprsend_agents_toolkit.tools.tenants import (
     UpdateTenantPreferenceCategoryTool,
 )
 from suprsend_agents_toolkit.tools.management import (
+    DraftTriggerWorkflowTool,
+    TestTemplateTool,
     GetPreferenceCategoriesTool,
     UpdatePreferenceCategoryTool,
     ListWorkflowsTool,
@@ -49,11 +51,26 @@ from suprsend_agents_toolkit.tools.management import (
     PushSchemaTool,
     CommitSchemaTool,
     LinkEventSchemaTool,
+    ListTemplatesTool,
+    GetTemplateTool,
+    GetTemplateVariantsTool,
+    GetVariantContentTool,
+    GetTemplateVersionsTool,
+    GetMockDataTool,
+    UpdateMockDataTool,
+    ValidateTemplateTool,
+    UpsertTemplateTool,
+    UpsertVariantContentTool,
+    UpsertVariantTool,
+    ValidateVariantTool,
+    PreCommitValidateTemplateTool,
+    CommitTemplateTool,
 )
 from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
 from suprsend_agents_toolkit.tools.validate_schema import ValidateSchemaTool
+from suprsend_agents_toolkit.tools.validate_json_jsonnet import ValidateJsonJsonnetTool
 
 __all__ = ["SuprSendToolkit", "ToolContext", "Permissions", "ServiceTokenAuth", "JWTAuth"]
 
@@ -114,10 +131,26 @@ _ALL_TOOLS: dict[str, type] = {
     "trigger_workflow": TriggerWorkflowTool,
     # events
     "validate_schema": ValidateSchemaTool,
+    "validate_json_jsonnet": ValidateJsonJsonnetTool,
     "track_event": TrackEventTool,
-    # coming soon:
-    # "guardrail":          GuardrailTool,          no permission (always included)
-    # "upsert_subscriber":  UpsertSubscriberTool,   permission_category="subscribers", operation="manage"
+    # test runs
+    "draft_trigger_workflow": DraftTriggerWorkflowTool,
+    "test_template": TestTemplateTool,
+    # templates
+    "list_templates": ListTemplatesTool,
+    "get_template": GetTemplateTool,
+    "get_template_variants": GetTemplateVariantsTool,
+    "get_variant_content": GetVariantContentTool,
+    "get_template_versions": GetTemplateVersionsTool,
+    "get_mock_data": GetMockDataTool,
+    "update_mock_data": UpdateMockDataTool,
+    "validate_template": ValidateTemplateTool,
+    "upsert_template": UpsertTemplateTool,
+    "upsert_variant_content": UpsertVariantContentTool,
+    "upsert_variant": UpsertVariantTool,
+    "validate_variant": ValidateVariantTool,
+    "pre_commit_validate_template": PreCommitValidateTemplateTool,
+    "commit_template": CommitTemplateTool,
 }
 
 
@@ -200,6 +233,7 @@ class SuprSendToolkit:
         jwt_getter: "Callable[[Any], str] | None" = None,
         allow_writes: bool = True,
         allow_destructive: bool = True,
+        strip_artifact_tools: "set[str] | frozenset[str] | None" = None,
     ) -> None:
         if auth:
             _auth = auth
@@ -214,6 +248,7 @@ class SuprSendToolkit:
         _policy = {"allow_writes": allow_writes, "allow_destructive": allow_destructive}
         self._client = AsyncSuprSendClient(auth=_auth, context=_ctx, jwt_getter=jwt_getter, policy=_policy)
         self._permissions = permissions
+        self._strip_artifact_tools: frozenset[str] = frozenset(strip_artifact_tools or [])
 
     def _permitted_names(self, requested: list[str] | None) -> list[str]:
         """Names from the requested list (or all) that pass the permission check."""
@@ -231,7 +266,10 @@ class SuprSendToolkit:
         ]
 
     def _instantiate(self, name: str) -> object:
-        return _ALL_TOOLS[name](client=self._client)
+        instance = _ALL_TOOLS[name](client=self._client)
+        if name in self._strip_artifact_tools:
+            instance.strip_artifact = True
+        return instance
 
     def _builtin_instances(self) -> list:
         return [cls(client=self._client) for cls in _BUILTIN_TOOLS.values()]

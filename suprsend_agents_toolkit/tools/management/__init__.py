@@ -1,10 +1,29 @@
+from suprsend_agents_toolkit.tools.management.test_runs import DraftTriggerWorkflowTool, TestTemplateTool
 from suprsend_agents_toolkit.tools.management.preference_categories import GetPreferenceCategoriesTool, UpdatePreferenceCategoryTool
 from suprsend_agents_toolkit.tools.management.workflows import ListWorkflowsTool, GetWorkflowTool, ValidateWorkflowTool, PushWorkflowTool, CommitWorkflowTool
 from suprsend_agents_toolkit.tools.management.events import GetEventDetailsTool
 from suprsend_agents_toolkit.tools.management.translations import GetTranslationDetailsTool, UpdateTranslationTool, CommitTranslationTool
 from suprsend_agents_toolkit.tools.management.schemas import ListSchemasTool, GetSchemaTool, PushSchemaTool, CommitSchemaTool, LinkEventSchemaTool
+from suprsend_agents_toolkit.tools.management.templates import (
+    ListTemplatesTool,
+    GetTemplateTool,
+    GetTemplateVariantsTool,
+    GetVariantContentTool,
+    GetTemplateVersionsTool,
+    GetMockDataTool,
+    UpdateMockDataTool,
+    ValidateTemplateTool,
+    UpsertTemplateTool,
+    UpsertVariantContentTool,
+    UpsertVariantTool,
+    ValidateVariantTool,
+    PreCommitValidateTemplateTool,
+    CommitTemplateTool,
+)
 
 __all__ = [
+    "DraftTriggerWorkflowTool",
+    "TestTemplateTool",
     "GetPreferenceCategoriesTool",
     "UpdatePreferenceCategoryTool",
     "ListWorkflowsTool",
@@ -21,4 +40,18 @@ __all__ = [
     "PushSchemaTool",
     "CommitSchemaTool",
     "LinkEventSchemaTool",
+    "ListTemplatesTool",
+    "GetTemplateTool",
+    "GetTemplateVariantsTool",
+    "GetVariantContentTool",
+    "GetTemplateVersionsTool",
+    "GetMockDataTool",
+    "UpdateMockDataTool",
+    "ValidateTemplateTool",
+    "UpsertTemplateTool",
+    "UpsertVariantContentTool",
+    "UpsertVariantTool",
+    "ValidateVariantTool",
+    "PreCommitValidateTemplateTool",
+    "CommitTemplateTool",
 ]
