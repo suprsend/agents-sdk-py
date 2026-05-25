@@ -13,12 +13,13 @@ class PreferenceCategoriesApi(BaseApi):
     def _url(self, workspace: str) -> str:
         return f"{self.config.base_url}/v1/{quote(workspace, safe='')}/preference_category/"
 
-    def list(self, workspace: str, extra_headers: dict | None = None) -> dict:
+    def list(self, workspace: str, mode: str = "live", extra_headers: dict | None = None) -> dict:
         """
         List all notification/preference categories for a workspace.
 
         Args:
             workspace:     Workspace slug.
+            mode:          "live" (published) or "draft" (unpublished changes). Defaults to "live".
             extra_headers: Additional headers merged into the request.
 
         Returns:
@@ -27,7 +28,12 @@ class PreferenceCategoriesApi(BaseApi):
         Raises:
             SuprsendManagementException: on 4xx / 5xx responses.
         """
-        resp = requests.get(self._url(workspace), headers=self._headers(extra_headers), timeout=_DEFAULT_TIMEOUT)
+        resp = requests.get(
+            self._url(workspace),
+            params={"mode": mode},
+            headers=self._headers(extra_headers),
+            timeout=_DEFAULT_TIMEOUT,
+        )
         if resp.status_code >= 400:
             raise SuprsendManagementException(resp)
         return resp.json()

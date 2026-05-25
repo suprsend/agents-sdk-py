@@ -14,6 +14,10 @@ class GetPreferenceCategoriesInput(BaseModel):
         default="",
         description="Workspace slug. Uses configured default if omitted.",
     )
+    mode: str = Field(
+        default="live",
+        description='Which version to fetch: "live" (published) or "draft" (unpublished changes). Defaults to "live".',
+    )
 
 
 class GetPreferenceCategoriesTool(ManagementTool):
@@ -37,6 +41,7 @@ class GetPreferenceCategoriesTool(ManagementTool):
     async def execute(
         self,
         client: AsyncSuprSendClient,
+        mode: str = "live",
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -47,6 +52,7 @@ class GetPreferenceCategoriesTool(ManagementTool):
             result = await asyncio.to_thread(
                 mgmt.preference_categories.list,
                 ws,
+                mode=mode,
                 extra_headers=headers,
             )
             return yaml.dump(result, default_flow_style=False), result
