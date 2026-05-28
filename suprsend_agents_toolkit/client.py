@@ -110,6 +110,13 @@ class AsyncSuprSendClient:
             resp.raise_for_status()
             return await resp.json()
 
+    async def patch(self, url: str, payload: dict | None = None) -> Any:
+        body = json.dumps(payload or {}).encode()
+        headers = self.auth.get_headers()
+        async with self._get_session().patch(url, data=body, headers=headers) as resp:
+            resp.raise_for_status()
+            return await resp.json()
+
     # ── Exchange ──────────────────────────────────────────────────────────────
 
     def _make_cache_key(self, workspace: str) -> str:
