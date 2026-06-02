@@ -9,14 +9,11 @@ from suprsend_agents_toolkit.core.base import SuprSendTool
 # ── GetSyncTaskSchemaTool ─────────────────────────────────────────────────────
 
 class GetSyncTaskSchemaInput(BaseModel):
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
+    pass
 
 
 class GetSyncTaskSchemaTool(SuprSendTool):
-    """GET /v1/{ws}/subscriber_sync_task/schema/"""
+    """GET /v1/subscriber_sync_task/schema/"""
 
     name = "get_sync_task_schema"
     description = (
@@ -32,11 +29,8 @@ class GetSyncTaskSchemaTool(SuprSendTool):
     idempotent = True
 
     async def execute(self, client: AsyncSuprSendClient, **kwargs) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/schema/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/schema/"
             result = await client.get(url)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -64,14 +58,10 @@ class CreateDynamicListInput(BaseModel):
         default=False,
         description="Fire an event when a user exits this list.",
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class CreateDynamicListTool(SuprSendTool):
-    """POST /v1/{ws}/client_subscriber_list/"""
+    """POST /v1/client_subscriber_list/"""
 
     name = "create_dynamic_list"
     description = (
@@ -97,15 +87,12 @@ class CreateDynamicListTool(SuprSendTool):
         track_user_exit: bool = False,
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not list_name:
             return "Error: list_name is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/client_subscriber_list/"
+            url = f"{client.base_url}/v1/client_subscriber_list/"
             payload: dict = {
                 "list_id": list_id,
                 "list_name": list_name,
@@ -140,14 +127,10 @@ class ListDynamicListsInput(BaseModel):
         default=0,
         description="Pagination offset (default 0).",
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class ListDynamicListsTool(SuprSendTool):
-    """GET /v1/{ws}/client_subscriber_list/"""
+    """GET /v1/client_subscriber_list/"""
 
     name = "list_dynamic_lists"
     description = (
@@ -171,11 +154,8 @@ class ListDynamicListsTool(SuprSendTool):
         offset: int = 0,
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/client_subscriber_list/"
+            url = f"{client.base_url}/v1/client_subscriber_list/"
             params: dict = {"list_type": list_type, "limit": limit, "offset": offset}
             if list_id:
                 params["list_id"] = list_id
@@ -195,14 +175,10 @@ class GetListSubscribersInput(BaseModel):
         default=20,
         description="Maximum number of subscribers to return (default 20).",
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class GetListSubscribersTool(SuprSendTool):
-    """GET /v1/{ws}/subscriber_list/{list_id}/subscriber/"""
+    """GET /v1/subscriber_list/{list_id}/subscriber/"""
 
     name = "get_list_subscribers"
     description = (
@@ -224,13 +200,10 @@ class GetListSubscribersTool(SuprSendTool):
         limit: int = 20,
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_list/{list_id}/subscriber/"
+            url = f"{client.base_url}/v1/subscriber_list/{list_id}/subscriber/"
             result = await client.get(url, params={"limit": limit})
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:

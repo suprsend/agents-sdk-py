@@ -18,16 +18,12 @@ class DryRunSyncQueryInput(BaseModel):
             "Example: SELECT distinct_id FROM users WHERE active = true LIMIT 10"
         )
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class DryRunSyncQueryTool(SuprSendTool):
     """
-    POST /v1/{ws}/subscriber_sync_task/{list_id}/version/_/dry_run/
-    POST /v1/{ws}/subscriber_sync_task/{list_id}/version/_/dry_run/count/
+    POST /v1/subscriber_sync_task/{list_id}/version/_/dry_run/
+    POST /v1/subscriber_sync_task/{list_id}/version/_/dry_run/count/
     """
 
     name = "dry_run_sync_query"
@@ -50,15 +46,12 @@ class DryRunSyncQueryTool(SuprSendTool):
         query_text: str = "",
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
-            base = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/version/_/dry_run"
+            base = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/dry_run"
             payload = {"query_text": query_text}
             rows_result = await client.post(f"{base}/", payload)
             count_result = await client.post(f"{base}/count/", payload)
@@ -77,14 +70,10 @@ class GetSyncTaskInput(BaseModel):
     list_id: str = Field(
         description="Unique identifier of the subscriber list."
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class GetSyncTaskTool(SuprSendTool):
-    """GET /v1/{ws}/subscriber_sync_task/{list_id}/"""
+    """GET /v1/subscriber_sync_task/{list_id}/"""
 
     name = "get_sync_task"
     description = (
@@ -106,13 +95,10 @@ class GetSyncTaskTool(SuprSendTool):
         list_id: str = "",
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/"
             result = await client.get(url)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -125,14 +111,10 @@ class GetSyncTaskDraftInput(BaseModel):
     list_id: str = Field(
         description="Unique identifier of the subscriber list."
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class GetSyncTaskDraftTool(SuprSendTool):
-    """GET /v1/{ws}/subscriber_sync_task/{list_id}/version/_/"""
+    """GET /v1/subscriber_sync_task/{list_id}/version/_/"""
 
     name = "get_sync_task_draft"
     description = (
@@ -152,13 +134,10 @@ class GetSyncTaskDraftTool(SuprSendTool):
         list_id: str = "",
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/version/_/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/"
             result = await client.get(url)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -175,14 +154,10 @@ class GetSyncTaskExecutionsInput(BaseModel):
         default=10,
         description="Maximum number of executions to return, ordered newest first (default 10).",
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class GetSyncTaskExecutionsTool(SuprSendTool):
-    """GET /v1/{ws}/task_request/?list_id={list_id}"""
+    """GET /v1/task_request/?list_id={list_id}"""
 
     name = "get_sync_task_executions"
     description = (
@@ -205,13 +180,10 @@ class GetSyncTaskExecutionsTool(SuprSendTool):
         limit: int = 10,
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/task_request/"
+            url = f"{client.base_url}/v1/task_request/"
             result = await client.get(url, params={"list_id": list_id, "limit": limit})
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -238,14 +210,10 @@ class UpdateSyncTaskDraftInput(BaseModel):
         default=[],
         description="Optional column mappings for profile sync. Leave empty for standard distinct_id-only queries.",
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class UpdateSyncTaskDraftTool(SuprSendTool):
-    """PATCH /v1/{ws}/subscriber_sync_task/{list_id}/version/_/"""
+    """PATCH /v1/subscriber_sync_task/{list_id}/version/_/"""
 
     name = "update_sync_task_draft"
     description = (
@@ -269,15 +237,12 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
         column_mappings: list = [],
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/version/_/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/"
             payload = {
                 "query_text": query_text,
                 "update_type": update_type,
@@ -306,14 +271,10 @@ class PublishSyncTaskInput(BaseModel):
         default=[],
         description="Optional column mappings for profile sync.",
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class PublishSyncTaskTool(SuprSendTool):
-    """PATCH /v1/{ws}/subscriber_sync_task/{list_id}/version/_/ with status=active"""
+    """PATCH /v1/subscriber_sync_task/{list_id}/version/_/ with status=active"""
 
     name = "publish_sync_task"
     description = (
@@ -337,15 +298,12 @@ class PublishSyncTaskTool(SuprSendTool):
         column_mappings: list = [],
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/version/_/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/"
             payload = {
                 "query_text": query_text,
                 "update_type": update_type,
@@ -364,14 +322,10 @@ class RunSyncNowInput(BaseModel):
     list_id: str = Field(
         description="Unique identifier of the subscriber list to sync immediately."
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class RunSyncNowTool(SuprSendTool):
-    """POST /v1/{ws}/subscriber_sync_task/{list_id}/schedule_now/"""
+    """POST /v1/subscriber_sync_task/{list_id}/schedule_now/"""
 
     name = "run_sync_now"
     description = (
@@ -392,13 +346,10 @@ class RunSyncNowTool(SuprSendTool):
         list_id: str = "",
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/schedule_now/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/schedule_now/"
             result = await client.post(url, {})
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -414,14 +365,10 @@ class ToggleSyncTaskInput(BaseModel):
     is_enabled: bool = Field(
         description="True to enable the sync task (allow scheduled runs), False to disable it."
     )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
 
 
 class ToggleSyncTaskTool(SuprSendTool):
-    """PATCH /v1/{ws}/subscriber_sync_task/{list_id}/"""
+    """PATCH /v1/subscriber_sync_task/{list_id}/"""
 
     name = "toggle_sync_task"
     description = (
@@ -443,13 +390,10 @@ class ToggleSyncTaskTool(SuprSendTool):
         is_enabled: bool = True,
         **kwargs,
     ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/{ws}/subscriber_sync_task/{list_id}/"
+            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/"
             result = await client.patch(url, {"is_enabled": is_enabled})
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
