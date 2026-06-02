@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 
 from pydantic import BaseModel, Field
@@ -9,7 +10,10 @@ from suprsend_agents_toolkit.core.base import SuprSendTool
 # ── GetSyncTaskSchemaTool ─────────────────────────────────────────────────────
 
 class GetSyncTaskSchemaInput(BaseModel):
-    pass
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
 
 
 class GetSyncTaskSchemaTool(SuprSendTool):
@@ -29,9 +33,12 @@ class GetSyncTaskSchemaTool(SuprSendTool):
     idempotent = True
 
     async def execute(self, client: AsyncSuprSendClient, **kwargs) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/schema/"
-            result = await client.get(url)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_schema)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, "fetching sync task schema")
@@ -57,6 +64,10 @@ class CreateDynamicListInput(BaseModel):
     track_user_exit: bool = Field(
         default=False,
         description="Fire an event when a user exits this list.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -87,22 +98,19 @@ class CreateDynamicListTool(SuprSendTool):
         track_user_exit: bool = False,
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not list_name:
             return "Error: list_name is required."
         try:
-            url = f"{client.base_url}/v1/client_subscriber_list/"
-            payload: dict = {
-                "list_id": list_id,
-                "list_name": list_name,
-                "list_type": "dynamic_list",
-                "track_user_entry": track_user_entry,
-                "track_user_exit": track_user_exit,
-            }
-            if list_description:
-                payload["list_description"] = list_description
-            result = await client.post(url, payload)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.subscriber_sync.create_list,
+                list_id, list_name, list_description, track_user_entry, track_user_exit,
+            )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"creating dynamic list '{list_id}'")
@@ -126,6 +134,10 @@ class ListDynamicListsInput(BaseModel):
     offset: int = Field(
         default=0,
         description="Pagination offset (default 0).",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -154,12 +166,14 @@ class ListDynamicListsTool(SuprSendTool):
         offset: int = 0,
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         try:
-            url = f"{client.base_url}/v1/client_subscriber_list/"
-            params: dict = {"list_type": list_type, "limit": limit, "offset": offset}
-            if list_id:
-                params["list_id"] = list_id
-            result = await client.get(url, params=params)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.subscriber_sync.list_lists, list_type, limit, offset, list_id,
+            )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, "listing dynamic lists")
@@ -174,6 +188,10 @@ class GetListSubscribersInput(BaseModel):
     limit: int = Field(
         default=20,
         description="Maximum number of subscribers to return (default 20).",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -200,11 +218,14 @@ class GetListSubscribersTool(SuprSendTool):
         limit: int = 20,
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_list/{list_id}/subscriber/"
-            result = await client.get(url, params={"limit": limit})
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_list_subscribers, list_id, limit)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching subscribers for list '{list_id}'")

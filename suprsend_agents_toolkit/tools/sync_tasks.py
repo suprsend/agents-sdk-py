@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 
 from pydantic import BaseModel, Field
@@ -17,6 +18,10 @@ class DryRunSyncQueryInput(BaseModel):
             "SQL query to test. Must SELECT at least a 'distinct_id' column. "
             "Example: SELECT distinct_id FROM users WHERE active = true LIMIT 10"
         )
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -46,15 +51,19 @@ class DryRunSyncQueryTool(SuprSendTool):
         query_text: str = "",
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
-            base = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/dry_run"
-            payload = {"query_text": query_text}
-            rows_result = await client.post(f"{base}/", payload)
-            count_result = await client.post(f"{base}/count/", payload)
+            sdk = await client.get_sdk_instance(ws)
+            rows_result, count_result = await asyncio.gather(
+                asyncio.to_thread(sdk.subscriber_sync.dry_run, list_id, query_text),
+                asyncio.to_thread(sdk.subscriber_sync.dry_run_count, list_id, query_text),
+            )
             combined = {
                 "sample_data": rows_result.get("data", []),
                 "total_count": count_result.get("count", 0),
@@ -69,6 +78,10 @@ class DryRunSyncQueryTool(SuprSendTool):
 class GetSyncTaskInput(BaseModel):
     list_id: str = Field(
         description="Unique identifier of the subscriber list."
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -95,11 +108,14 @@ class GetSyncTaskTool(SuprSendTool):
         list_id: str = "",
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/"
-            result = await client.get(url)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task, list_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching sync task for list '{list_id}'")
@@ -110,6 +126,10 @@ class GetSyncTaskTool(SuprSendTool):
 class GetSyncTaskDraftInput(BaseModel):
     list_id: str = Field(
         description="Unique identifier of the subscriber list."
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -134,11 +154,14 @@ class GetSyncTaskDraftTool(SuprSendTool):
         list_id: str = "",
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/"
-            result = await client.get(url)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_draft, list_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching draft version for list '{list_id}'")
@@ -153,6 +176,10 @@ class GetSyncTaskExecutionsInput(BaseModel):
     limit: int = Field(
         default=10,
         description="Maximum number of executions to return, ordered newest first (default 10).",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -180,11 +207,14 @@ class GetSyncTaskExecutionsTool(SuprSendTool):
         limit: int = 10,
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/task_request/"
-            result = await client.get(url, params={"list_id": list_id, "limit": limit})
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_executions, list_id, limit)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching executions for list '{list_id}'")
@@ -209,6 +239,10 @@ class UpdateSyncTaskDraftInput(BaseModel):
     column_mappings: list = Field(
         default=[],
         description="Optional column mappings for profile sync. Leave empty for standard distinct_id-only queries.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -237,18 +271,18 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
         column_mappings: list = [],
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/"
-            payload = {
-                "query_text": query_text,
-                "update_type": update_type,
-                "column_mappings": column_mappings,
-            }
-            result = await client.patch(url, payload)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.subscriber_sync.update_task_draft, list_id, query_text, update_type, column_mappings,
+            )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"updating draft for list '{list_id}'")
@@ -270,6 +304,10 @@ class PublishSyncTaskInput(BaseModel):
     column_mappings: list = Field(
         default=[],
         description="Optional column mappings for profile sync.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -298,19 +336,18 @@ class PublishSyncTaskTool(SuprSendTool):
         column_mappings: list = [],
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/version/_/"
-            payload = {
-                "query_text": query_text,
-                "update_type": update_type,
-                "column_mappings": column_mappings,
-                "status": "active",
-            }
-            result = await client.patch(url, payload)
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(
+                sdk.subscriber_sync.publish_task, list_id, query_text, update_type, column_mappings,
+            )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"publishing sync task for list '{list_id}'")
@@ -321,6 +358,10 @@ class PublishSyncTaskTool(SuprSendTool):
 class RunSyncNowInput(BaseModel):
     list_id: str = Field(
         description="Unique identifier of the subscriber list to sync immediately."
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -346,11 +387,14 @@ class RunSyncNowTool(SuprSendTool):
         list_id: str = "",
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/schedule_now/"
-            result = await client.post(url, {})
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.run_now, list_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"scheduling sync now for list '{list_id}'")
@@ -364,6 +408,10 @@ class ToggleSyncTaskInput(BaseModel):
     )
     is_enabled: bool = Field(
         description="True to enable the sync task (allow scheduled runs), False to disable it."
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
     )
 
 
@@ -390,11 +438,14 @@ class ToggleSyncTaskTool(SuprSendTool):
         is_enabled: bool = True,
         **kwargs,
     ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
         try:
-            url = f"{client.base_url}/v1/subscriber_sync_task/{list_id}/"
-            result = await client.patch(url, {"is_enabled": is_enabled})
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.toggle_task, list_id, is_enabled)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             action = "enabling" if is_enabled else "disabling"
