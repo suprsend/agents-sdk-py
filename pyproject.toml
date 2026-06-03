@@ -3,7 +3,7 @@ name = "suprsend-agents-toolkit"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "aiohttp==3.13.4",
+    "aiohttp==3.14.0",
     "pydantic==2.12.5",
     "pyyaml==6.0.2",
     "suprsend-py-sdk @ git+https://github.com/suprsend/suprsend-py-sdk.git@main",
