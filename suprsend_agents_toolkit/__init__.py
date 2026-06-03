@@ -68,12 +68,15 @@ from suprsend_agents_toolkit.tools.management import (
 )
 from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
 from suprsend_agents_toolkit.tools.subscriber_lists import (
+    CreateEventTool,
     GetSyncTaskSchemaTool,
     CreateDynamicListTool,
     ListDynamicListsTool,
     GetListSubscribersTool,
 )
 from suprsend_agents_toolkit.tools.sync_tasks import (
+    CreateSyncTaskTool,
+    GetSyncTaskActiveTool,
     DryRunSyncQueryTool,
     GetSyncTaskTool,
     GetSyncTaskDraftTool,
@@ -144,7 +147,10 @@ _ALL_TOOLS: dict[str, type] = {
     "add_user_to_list": AddUserToListTool,
     "remove_user_from_list": RemoveUserFromListTool,
     # dynamic lists & sync tasks
+    "create_event": CreateEventTool,
     "get_sync_task_schema": GetSyncTaskSchemaTool,
+    "create_sync_task": CreateSyncTaskTool,
+    "get_sync_task_active": GetSyncTaskActiveTool,
     "create_dynamic_list": CreateDynamicListTool,
     "list_dynamic_lists": ListDynamicListsTool,
     "get_list_subscribers": GetListSubscribersTool,

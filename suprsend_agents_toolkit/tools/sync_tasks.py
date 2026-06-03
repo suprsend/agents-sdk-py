@@ -7,6 +7,107 @@ from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
 
+# ── CreateSyncTaskTool ────────────────────────────────────────────────────────
+
+class CreateSyncTaskInput(BaseModel):
+    name: str = Field(
+        description="Human-readable name for the sync task."
+    )
+    list_id: str = Field(
+        description="list_id of the subscriber list this sync task will populate."
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CreateSyncTaskTool(SuprSendTool):
+    """POST /v1/subscriber_sync_task/"""
+
+    name = "create_sync_task"
+    description = (
+        "Create a sync task for an existing dynamic subscriber list. "
+        "Must be called after create_dynamic_list. "
+        "Once created, use update_sync_task_draft to save a SQL query, "
+        "then publish_sync_task to make it active."
+    )
+    args_schema = CreateSyncTaskInput
+    permission_category = "lists"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        name: str = "",
+        list_id: str = "",
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not name:
+            return "Error: name is required."
+        if not list_id:
+            return "Error: list_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.create_sync_task, name, list_id)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"creating sync task for list '{list_id}'")
+
+
+# ── GetSyncTaskActiveTool ─────────────────────────────────────────────────────
+
+class GetSyncTaskActiveInput(BaseModel):
+    list_id: str = Field(
+        description="Unique identifier of the subscriber list."
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class GetSyncTaskActiveTool(SuprSendTool):
+    """GET /v1/subscriber_sync_task/{list_id}/version/active/"""
+
+    name = "get_sync_task_active"
+    description = (
+        "Get the currently active (published) version of a sync task's query configuration. "
+        "Returns the live query_text and version details. "
+        "Use get_sync_task_draft to see the unpublished draft instead."
+    )
+    args_schema = GetSyncTaskActiveInput
+    permission_category = "lists"
+    permission_operation = "read"
+    read_only = True
+    destructive = False
+    idempotent = True
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        list_id: str = "",
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not list_id:
+            return "Error: list_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_active_version, list_id)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"fetching active version for list '{list_id}'")
+
+
 # ── DryRunSyncQueryTool ───────────────────────────────────────────────────────
 
 class DryRunSyncQueryInput(BaseModel):

@@ -6,6 +6,57 @@ from pydantic import BaseModel, Field
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
+# ── CreateEventTool ───────────────────────────────────────────────────────────
+
+class CreateEventInput(BaseModel):
+    name: str = Field(
+        description="Event name/identifier (e.g. 'user_signed_up')."
+    )
+    description: str = Field(
+        default="",
+        description="Optional description of what this event represents.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CreateEventTool(SuprSendTool):
+    """POST /v1/staging/event/"""
+
+    name = "create_event"
+    description = (
+        "Create a new event definition in the workspace. "
+        "Provide a unique event name and an optional description."
+    )
+    args_schema = CreateEventInput
+    permission_category = "management"
+    permission_subcategory = "events"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        name: str = "",
+        description: str = "",
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not name:
+            return "Error: name is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            result = await asyncio.to_thread(sdk.events.create, name, description)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"creating event '{name}'")
+
 
 # ── GetSyncTaskSchemaTool ─────────────────────────────────────────────────────
 
