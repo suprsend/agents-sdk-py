@@ -75,7 +75,6 @@ from suprsend_agents_toolkit.tools.subscriber_lists import (
     GetListSubscribersTool,
 )
 from suprsend_agents_toolkit.tools.sync_tasks import (
-    CreateSyncTaskTool,
     GetSyncTaskActiveTool,
     DryRunSyncQueryTool,
     GetSyncTaskTool,
@@ -149,7 +148,6 @@ _ALL_TOOLS: dict[str, type] = {
     # dynamic lists & sync tasks
     "create_event": CreateEventTool,
     "get_sync_task_schema": GetSyncTaskSchemaTool,
-    "create_sync_task": CreateSyncTaskTool,
     "get_sync_task_active": GetSyncTaskActiveTool,
     "create_dynamic_list": CreateDynamicListTool,
     "list_dynamic_lists": ListDynamicListsTool,

@@ -99,10 +99,10 @@ class GetSyncTaskSchemaTool(SuprSendTool):
 
 class CreateDynamicListInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier for the subscriber list (slug-style, e.g. 'active-users-2024')."
+        description="Required. Slug-style identifier for the list using only letters, numbers, hyphens, and underscores (e.g. 'active-users-2024'). Derived from the list name."
     )
     list_name: str = Field(
-        description="Human-readable display name for the list."
+        description="Required. Human-readable display name for the list."
     )
     list_description: str = Field(
         default="",

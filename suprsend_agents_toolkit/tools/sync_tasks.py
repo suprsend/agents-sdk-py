@@ -7,65 +7,11 @@ from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
 
-# ── CreateSyncTaskTool ────────────────────────────────────────────────────────
-
-class CreateSyncTaskInput(BaseModel):
-    name: str = Field(
-        description="Human-readable name for the sync task."
-    )
-    list_id: str = Field(
-        description="list_id of the subscriber list this sync task will populate."
-    )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
-
-
-class CreateSyncTaskTool(SuprSendTool):
-    """POST /v1/subscriber_sync_task/"""
-
-    name = "create_sync_task"
-    description = (
-        "Create a sync task for an existing dynamic subscriber list. "
-        "Must be called after create_dynamic_list. "
-        "Once created, use update_sync_task_draft to save a SQL query, "
-        "then publish_sync_task to make it active."
-    )
-    args_schema = CreateSyncTaskInput
-    permission_category = "lists"
-    permission_operation = "manage"
-    read_only = False
-    destructive = False
-    idempotent = False
-
-    async def execute(
-        self,
-        client: AsyncSuprSendClient,
-        name: str = "",
-        list_id: str = "",
-        **kwargs,
-    ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
-        if not name:
-            return "Error: name is required."
-        if not list_id:
-            return "Error: list_id is required."
-        try:
-            sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.create_sync_task, name, list_id)
-            return yaml.dump(result, default_flow_style=False), result
-        except Exception as e:
-            return self._api_error(e, f"creating sync task for list '{list_id}'")
-
-
 # ── GetSyncTaskActiveTool ─────────────────────────────────────────────────────
 
 class GetSyncTaskActiveInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
+        description="Required. list_id of the subscriber list."
     )
     workspace: str = Field(
         default="",
@@ -112,12 +58,12 @@ class GetSyncTaskActiveTool(SuprSendTool):
 
 class DryRunSyncQueryInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list whose sync task will be tested."
+        description="Required. list_id of the subscriber list whose sync task will be tested."
     )
     query_text: str = Field(
         description=(
-            "SQL query to test. Must SELECT at least a 'distinct_id' column. "
-            "Example: SELECT distinct_id FROM users WHERE active = true LIMIT 10"
+            "Required. SQL query to test. Must use SELECT DISTINCT distinct_id. "
+            "Example: SELECT DISTINCT distinct_id FROM users WHERE active = true LIMIT 10"
         )
     )
     workspace: str = Field(
@@ -178,7 +124,7 @@ class DryRunSyncQueryTool(SuprSendTool):
 
 class GetSyncTaskInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
+        description="Required. list_id of the subscriber list."
     )
     workspace: str = Field(
         default="",
@@ -226,7 +172,7 @@ class GetSyncTaskTool(SuprSendTool):
 
 class GetSyncTaskDraftInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
+        description="Required. list_id of the subscriber list."
     )
     workspace: str = Field(
         default="",
@@ -272,7 +218,7 @@ class GetSyncTaskDraftTool(SuprSendTool):
 
 class GetSyncTaskExecutionsInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
+        description="Required. list_id of the subscriber list."
     )
     limit: int = Field(
         default=10,
@@ -325,17 +271,21 @@ class GetSyncTaskExecutionsTool(SuprSendTool):
 
 class UpdateSyncTaskDraftInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
+        description="Required. list_id of the subscriber list."
     )
     query_text: str = Field(
         description=(
-            "SQL query that selects subscribers. Must include a 'distinct_id' column. "
-            "Example: SELECT distinct_id FROM users WHERE plan = 'pro'"
+            "Required. SQL query that selects subscribers. Must use SELECT DISTINCT distinct_id. "
+            "Example: SELECT DISTINCT distinct_id FROM users WHERE plan = 'pro'"
         )
     )
     update_type: str = Field(
         default="replace",
-        description="How to update the list on each sync. 'replace' replaces all members with query results.",
+        description=(
+            "How to update the list on each sync. "
+            "'replace' (default) — rebuilds the list from scratch on each sync. "
+            "'add' — merges new subscribers into the existing list without removing current members."
+        ),
     )
     column_mappings: list = Field(
         default=[],
@@ -393,18 +343,7 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
 
 class PublishSyncTaskInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
-    )
-    query_text: str = Field(
-        description="SQL query to publish as the active version."
-    )
-    update_type: str = Field(
-        default="replace",
-        description="How to update the list on each sync. Default is 'replace'.",
-    )
-    column_mappings: list = Field(
-        default=[],
-        description="Optional column mappings for profile sync.",
+        description="Required. list_id of the subscriber list whose draft will be published."
     )
     workspace: str = Field(
         default="",
@@ -417,9 +356,10 @@ class PublishSyncTaskTool(SuprSendTool):
 
     name = "publish_sync_task"
     description = (
-        "Publish the sync task query, making it the active version. "
-        "After publishing, call run_sync_now to immediately populate the list, "
-        "or the query will run on the configured schedule."
+        "Publish the draft query, making it the active version. "
+        "Call this after update_sync_task_draft has been saved and approved — "
+        "the saved draft is published as-is, no need to re-supply query_text. "
+        "The sync task will run on its configured schedule after publishing."
     )
     args_schema = PublishSyncTaskInput
     permission_category = "lists"
@@ -432,9 +372,6 @@ class PublishSyncTaskTool(SuprSendTool):
         self,
         client: AsyncSuprSendClient,
         list_id: str = "",
-        query_text: str = "",
-        update_type: str = "replace",
-        column_mappings: list = [],
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -442,13 +379,9 @@ class PublishSyncTaskTool(SuprSendTool):
             return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
-        if not query_text:
-            return "Error: query_text is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(
-                sdk.subscriber_sync.publish_task, list_id, query_text, update_type, column_mappings,
-            )
+            result = await asyncio.to_thread(sdk.subscriber_sync.publish_task, list_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"publishing sync task for list '{list_id}'")
@@ -458,7 +391,7 @@ class PublishSyncTaskTool(SuprSendTool):
 
 class RunSyncNowInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list to sync immediately."
+        description="Required. list_id of the subscriber list to sync immediately."
     )
     workspace: str = Field(
         default="",
@@ -505,10 +438,10 @@ class RunSyncNowTool(SuprSendTool):
 
 class ToggleSyncTaskInput(BaseModel):
     list_id: str = Field(
-        description="Unique identifier of the subscriber list."
+        description="Required. list_id of the subscriber list."
     )
     is_enabled: bool = Field(
-        description="True to enable the sync task (allow scheduled runs), False to disable it."
+        description="Required. True to enable the sync task (allow scheduled runs), False to disable it."
     )
     workspace: str = Field(
         default="",
