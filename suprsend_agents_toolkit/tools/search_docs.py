@@ -11,6 +11,16 @@ MINTLIFY_MCP_URL = "https://docs.suprsend.com/mcp"
 MCP_TOOL_NAME = "search_supr_send_notification"
 
 
+def _leaf_exceptions(exc: BaseException) -> list[BaseException]:
+    """Recursively unwrap ExceptionGroups to get the actual root-cause exceptions."""
+    if isinstance(exc, BaseExceptionGroup):
+        leaves: list[BaseException] = []
+        for sub in exc.exceptions:
+            leaves.extend(_leaf_exceptions(sub))
+        return leaves
+    return [exc]
+
+
 def _run_mcp_search(query: str) -> str:
     """
     Runs the MCP search in its own event loop.
@@ -22,6 +32,10 @@ def _run_mcp_search(query: str) -> str:
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(MCP_TOOL_NAME, {"query": query})
+                if result.isError:
+                    text_parts = [c.text for c in result.content if hasattr(c, "text")]
+                    error_msg = "\n".join(text_parts) if text_parts else "Unknown error"
+                    raise RuntimeError(error_msg)
                 if result.content:
                     text_parts = [c.text for c in result.content if hasattr(c, "text")]
                     return "\n".join(text_parts) if text_parts else "No results found."
@@ -30,6 +44,10 @@ def _run_mcp_search(query: str) -> str:
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(_call())
+    except BaseExceptionGroup as eg:
+        leaves = _leaf_exceptions(eg)
+        msg = "; ".join(str(e) for e in leaves)
+        raise RuntimeError(msg) from None
     finally:
         loop.close()
 
@@ -61,9 +79,6 @@ class SearchDocsTool(SuprSendTool):
         **_: object,
     ) -> str:
         if not query:
-            return "Invalid query provided."
+            raise ValueError("Invalid query provided.")
 
-        try:
-            return await asyncio.to_thread(_run_mcp_search, query)
-        except Exception as e:
-            return f"Error searching docs: {e}"
+        return await asyncio.to_thread(_run_mcp_search, query)
