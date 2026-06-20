@@ -68,7 +68,7 @@ class GetSyncTaskSchemaInput(BaseModel):
 
 
 class GetSyncTaskSchemaTool(SuprSendTool):
-    """GET /v1/subscriber_sync_task/schema/"""
+    """GET /v1/subscriber_sync_task_schema/"""
 
     name = "get_sync_task_schema"
     description = (
@@ -123,7 +123,7 @@ class CreateDynamicListInput(BaseModel):
 
 
 class CreateDynamicListTool(SuprSendTool):
-    """POST /v1/client_subscriber_list/"""
+    """POST /v1/subscriber_list/"""
 
     name = "create_dynamic_list"
     description = (
@@ -176,15 +176,25 @@ class ListDynamicListsInput(BaseModel):
     )
     list_type: str = Field(
         default="dynamic_list",
-        description="Filter by list type. Default is 'dynamic_list'.",
+        description=(
+            "Accepted for compatibility but NOT applied server-side — this endpoint "
+            "does not support filtering by list type, so results may include other list types."
+        ),
     )
     limit: int = Field(
         default=20,
-        description="Maximum number of results to return (default 20).",
+        description="Maximum number of results to return (default 20, max 1000).",
     )
     offset: int = Field(
         default=0,
         description="Pagination offset (default 0).",
+    )
+    is_enabled: str = Field(
+        default="",
+        description=(
+            "Filter by enabled state. Omit for enabled lists only; "
+            "'false' for disabled only; 'true,false' for all."
+        ),
     )
     workspace: str = Field(
         default="",
@@ -193,7 +203,7 @@ class ListDynamicListsInput(BaseModel):
 
 
 class ListDynamicListsTool(SuprSendTool):
-    """GET /v1/client_subscriber_list/"""
+    """GET /v1/subscriber_list/"""
 
     name = "list_dynamic_lists"
     description = (
@@ -215,6 +225,7 @@ class ListDynamicListsTool(SuprSendTool):
         list_type: str = "dynamic_list",
         limit: int = 20,
         offset: int = 0,
+        is_enabled: str = "",
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -223,7 +234,7 @@ class ListDynamicListsTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(
-                sdk.subscriber_sync.list_lists, list_type, limit, offset, list_id,
+                sdk.subscriber_sync.list_lists, list_type, limit, offset, list_id, is_enabled,
             )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:

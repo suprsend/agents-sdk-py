@@ -58,7 +58,8 @@ class GetSyncTaskActiveTool(SuprSendTool):
 
 class DryRunSyncQueryInput(BaseModel):
     list_id: str = Field(
-        description="Required. list_id of the subscriber list whose sync task will be tested."
+        default="",
+        description="Optional. Not used by the dry-run endpoint (it validates the query standalone); accepted for context only.",
     )
     query_text: str = Field(
         description=(
@@ -74,8 +75,8 @@ class DryRunSyncQueryInput(BaseModel):
 
 class DryRunSyncQueryTool(SuprSendTool):
     """
-    POST /v1/subscriber_sync_task/{list_id}/version/_/dry_run/
-    POST /v1/subscriber_sync_task/{list_id}/version/_/dry_run/count/
+    POST /v1/subscriber_list/dry_run/
+    POST /v1/subscriber_list/dry_run/count/
     """
 
     name = "dry_run_sync_query"
@@ -101,15 +102,13 @@ class DryRunSyncQueryTool(SuprSendTool):
         ws = self._workspace(client, kwargs)
         if not ws:
             return "Error: workspace is required."
-        if not list_id:
-            return "Error: list_id is required."
         if not query_text:
             return "Error: query_text is required."
         try:
             sdk = await client.get_sdk_instance(ws)
             rows_result, count_result = await asyncio.gather(
-                asyncio.to_thread(sdk.subscriber_sync.dry_run, list_id, query_text),
-                asyncio.to_thread(sdk.subscriber_sync.dry_run_count, list_id, query_text),
+                asyncio.to_thread(sdk.subscriber_sync.dry_run, query_text),
+                asyncio.to_thread(sdk.subscriber_sync.dry_run_count, query_text),
             )
             combined = {
                 "sample_data": rows_result.get("data", []),
