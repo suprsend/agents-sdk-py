@@ -75,8 +75,8 @@ class DryRunSyncQueryInput(BaseModel):
 
 class DryRunSyncQueryTool(SuprSendTool):
     """
-    POST /v1/subscriber_list/dry_run/
-    POST /v1/subscriber_list/dry_run/count/
+    POST /v1/subscriber_list/~/dry_run/
+    POST /v1/subscriber_list/~/dry_run/count/
     """
 
     name = "dry_run_sync_query"
