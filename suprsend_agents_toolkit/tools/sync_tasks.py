@@ -7,6 +7,18 @@ from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
 
+async def _resolve_sync_task_id(sdk, list_id: str) -> str:
+    """Resolve a list_id to its sync_task id.
+
+    The subscriber_sync_task endpoints are keyed by sync_task_id, but the agent
+    works in terms of list_id. The list-detail response carries the sync task
+    under the "sync_task" key, so we look it up once and extract the id.
+    Returns "" if the list has no associated sync task.
+    """
+    detail = await asyncio.to_thread(sdk.subscriber_lists.get, list_id)
+    return ((detail or {}).get("sync_task") or {}).get("id") or ""
+
+
 # ── GetSyncTaskActiveTool ─────────────────────────────────────────────────────
 
 class GetSyncTaskActiveInput(BaseModel):
@@ -48,7 +60,10 @@ class GetSyncTaskActiveTool(SuprSendTool):
             return "Error: list_id is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_active_version, list_id)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_active_version, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching active version for list '{list_id}'")
@@ -161,7 +176,10 @@ class GetSyncTaskTool(SuprSendTool):
             return "Error: list_id is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.get_task, list_id)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching sync task for list '{list_id}'")
@@ -207,7 +225,10 @@ class GetSyncTaskDraftTool(SuprSendTool):
             return "Error: list_id is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_draft, list_id)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
+            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_draft, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching draft version for list '{list_id}'")
@@ -330,8 +351,11 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
             return "Error: query_text is required."
         try:
             sdk = await client.get_sdk_instance(ws)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
             result = await asyncio.to_thread(
-                sdk.subscriber_sync.update_task_draft, list_id, query_text, update_type, column_mappings,
+                sdk.subscriber_sync.update_task_draft, sync_task_id, query_text, update_type, column_mappings,
             )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -380,7 +404,10 @@ class PublishSyncTaskTool(SuprSendTool):
             return "Error: list_id is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.publish_task, list_id)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
+            result = await asyncio.to_thread(sdk.subscriber_sync.publish_task, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"publishing sync task for list '{list_id}'")
@@ -427,7 +454,10 @@ class RunSyncNowTool(SuprSendTool):
             return "Error: list_id is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.run_now, list_id)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
+            result = await asyncio.to_thread(sdk.subscriber_sync.run_now, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"scheduling sync now for list '{list_id}'")
@@ -478,7 +508,10 @@ class ToggleSyncTaskTool(SuprSendTool):
             return "Error: list_id is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.toggle_task, list_id, is_enabled)
+            sync_task_id = await _resolve_sync_task_id(sdk, list_id)
+            if not sync_task_id:
+                return f"Error: list '{list_id}' has no associated sync task."
+            result = await asyncio.to_thread(sdk.subscriber_sync.toggle_task, sync_task_id, is_enabled)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             action = "enabling" if is_enabled else "disabling"
