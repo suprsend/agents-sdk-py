@@ -116,6 +116,8 @@ class SuprSendTool(ABC):
 
         Handles:
         - SuprsendManagementException: status code + detail/message/error body field
+        - SuprsendAPIException: status code + API message/detail (e.g. query
+          validation errors) so the model can correct and retry
         - aiohttp.ClientResponseError: status code only (URL stripped)
         - All others: generic message without the raw exception string
         """
@@ -133,6 +135,16 @@ class SuprSendTool(ABC):
                 if detail:
                     return f"API error {exc.status_code}: {detail}"
                 return f"API error {exc.status_code}: {context}"
+        except ImportError:
+            pass
+        try:
+            from suprsend.exception import SuprsendAPIException
+            if isinstance(exc, SuprsendAPIException):
+                detail = getattr(exc, "message", "") or ""
+                status = getattr(exc, "status_code", "")
+                if detail:
+                    return f"API error {status}: {detail}"
+                return f"API error {status}: {context}"
         except ImportError:
             pass
         try:
