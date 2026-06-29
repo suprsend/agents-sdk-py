@@ -67,6 +67,24 @@ from suprsend_agents_toolkit.tools.management import (
     CommitTemplateTool,
 )
 from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
+from suprsend_agents_toolkit.tools.subscriber_lists import (
+    CreateEventTool,
+    GetSyncTaskSchemaTool,
+    CreateDynamicListTool,
+    ListDynamicListsTool,
+    GetListSubscribersTool,
+)
+from suprsend_agents_toolkit.tools.sync_tasks import (
+    GetSyncTaskActiveTool,
+    DryRunSyncQueryTool,
+    GetSyncTaskTool,
+    GetSyncTaskDraftTool,
+    GetSyncTaskExecutionsTool,
+    UpdateSyncTaskDraftTool,
+    PublishSyncTaskTool,
+    RunSyncNowTool,
+    ToggleSyncTaskTool,
+)
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
 from suprsend_agents_toolkit.tools.validate_schema import ValidateSchemaTool
@@ -127,6 +145,21 @@ _ALL_TOOLS: dict[str, type] = {
     # lists
     "add_user_to_list": AddUserToListTool,
     "remove_user_from_list": RemoveUserFromListTool,
+    # dynamic lists & sync tasks
+    "create_event": CreateEventTool,
+    "get_sync_task_schema": GetSyncTaskSchemaTool,
+    "get_sync_task_active": GetSyncTaskActiveTool,
+    "create_dynamic_list": CreateDynamicListTool,
+    "list_dynamic_lists": ListDynamicListsTool,
+    "get_list_subscribers": GetListSubscribersTool,
+    "dry_run_sync_query": DryRunSyncQueryTool,
+    "get_sync_task": GetSyncTaskTool,
+    "get_sync_task_draft": GetSyncTaskDraftTool,
+    "get_sync_task_executions": GetSyncTaskExecutionsTool,
+    "update_sync_task_draft": UpdateSyncTaskDraftTool,
+    "publish_sync_task": PublishSyncTaskTool,
+    "run_sync_now": RunSyncNowTool,
+    "toggle_sync_task": ToggleSyncTaskTool,
     # workflows (trigger)
     "trigger_workflow": TriggerWorkflowTool,
     # events
