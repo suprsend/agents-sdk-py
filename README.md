@@ -333,7 +333,7 @@ agent = create_react_agent(
 ## Requirements
 
 - Python 3.11+
-- `aiohttp>=3.9`
+- `aiohttp>=3.14.3`
 - `pydantic>=2.0`
 - `langchain-core>=0.3` (optional, for LangChain/LangGraph integration)
-- `mcp>=1.0` (optional, for `search_suprsend_docs`)
+- `mcp>=1.28.1` (optional, for `search_suprsend_docs`)
