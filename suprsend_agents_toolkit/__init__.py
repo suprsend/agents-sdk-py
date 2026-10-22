@@ -249,6 +249,12 @@ class SuprSendToolkit:
         self._client = AsyncSuprSendClient(auth=_auth, context=_ctx, jwt_getter=jwt_getter, policy=_policy)
         self._permissions = permissions
         self._strip_artifact_tools: frozenset[str] = frozenset(strip_artifact_tools or [])
+        unknown = sorted(self._strip_artifact_tools - _ALL_TOOLS.keys())
+        if unknown:
+            raise ValueError(
+                f"Unknown tool name(s) in strip_artifact_tools: {unknown}. "
+                f"Valid names: {sorted(_ALL_TOOLS)}"
+            )
 
     def _permitted_names(self, requested: list[str] | None) -> list[str]:
         """Names from the requested list (or all) that pass the permission check."""

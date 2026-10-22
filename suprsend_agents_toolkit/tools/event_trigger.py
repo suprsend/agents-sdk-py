@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
-from suprsend_agents_toolkit.tools._utils import evaluate_jsonnet, validate_with_jsonpath
+from suprsend_agents_toolkit.tools._utils import evaluate_jsonnet_async, validate_with_jsonpath
 
 try:
     from suprsend.event import Event
@@ -100,7 +100,7 @@ class TrackEventTool(ManagementTool):
 
         # Evaluate Jsonnet if needed
         try:
-            properties = evaluate_jsonnet(properties)
+            properties = await evaluate_jsonnet_async(properties)
         except (ImportError, ValueError) as e:
             return f"Error evaluating properties: {e}"
 

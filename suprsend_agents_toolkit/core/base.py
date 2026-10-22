@@ -203,45 +203,27 @@ class SuprSendTool(ABC):
         from langchain_core.tools import StructuredTool
 
         tool_self = self
+        strip = self.strip_artifact
 
-        if self.strip_artifact:
-            async def _run_no_artifact(run_config: RunnableConfig, **kwargs: Any) -> str:
-                client = tool_self._resolve_client(run_config)
-                tool_self._enforce_policy(client)
-                try:
-                    result = await tool_self.execute(client=client, **kwargs)
-                    return result[0] if isinstance(result, tuple) else result
-                finally:
-                    if client is not tool_self._client:
-                        await client.close()
-
-            return StructuredTool.from_function(
-                coroutine=_run_no_artifact,
-                name=self.name,
-                description=self.description,
-                args_schema=self.args_schema,
-            )
-
-        async def _run(run_config: RunnableConfig, **kwargs: Any) -> "tuple[str, Any]":
+        async def _run(run_config: RunnableConfig, **kwargs: Any) -> Any:
             client = tool_self._resolve_client(run_config)
             tool_self._enforce_policy(client)
             try:
                 result = await tool_self.execute(client=client, **kwargs)
-                if isinstance(result, tuple):
-                    return result
-                return result, None
             finally:
                 # JWT-derived clients own their own aiohttp session; close it
                 # so connections are not leaked across tool calls.
                 if client is not tool_self._client:
                     await client.close()
+            content, artifact = result if isinstance(result, tuple) else (result, None)
+            return content if strip else (content, artifact)
 
         return StructuredTool.from_function(
             coroutine=_run,
             name=self.name,
             description=self.description,
             args_schema=self.args_schema,
-            response_format="content_and_artifact",
+            response_format="content" if strip else "content_and_artifact",
         )
 
     def to_openai(self) -> dict:

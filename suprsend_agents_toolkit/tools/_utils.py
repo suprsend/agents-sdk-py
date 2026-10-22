@@ -1,5 +1,20 @@
+import asyncio
 import json
 from typing import Union
+
+_JSONNET_TIMEOUT = 10  # seconds
+
+
+def _jsonnet_module():
+    """The `jsonnet` extra installs _jsonnet (C++); the `gojsonnet` package installs _gojsonnet."""
+    try:
+        import _jsonnet as jsonnet
+    except ImportError:
+        try:
+            import _gojsonnet as jsonnet
+        except ImportError:
+            raise ImportError("Install 'jsonnet' to use Jsonnet template support.")
+    return jsonnet
 
 
 def evaluate_jsonnet(value: Union[str, dict]) -> dict:
@@ -7,13 +22,11 @@ def evaluate_jsonnet(value: Union[str, dict]) -> dict:
     If value is a Jsonnet string, evaluate it and return the resulting dict.
     If value is already a dict, return it unchanged.
     Raises ValueError with a clear message on Jsonnet syntax errors.
+    Async callers should use evaluate_jsonnet_async instead.
     """
     if isinstance(value, dict):
         return value
-    try:
-        import _gojsonnet as jsonnet  # jsonnet package exposes _gojsonnet
-    except ImportError:
-        raise ImportError("Install 'jsonnet' to use Jsonnet template support.")
+    jsonnet = _jsonnet_module()
 
     def _block_import(base: str, rel: str) -> tuple[str, str]:
         raise RuntimeError(
@@ -26,6 +39,23 @@ def evaluate_jsonnet(value: Union[str, dict]) -> dict:
     except Exception as e:
         raise ValueError(f"Jsonnet evaluation error: {e}")
     return json.loads(evaluated)
+
+
+async def evaluate_jsonnet_async(value: Union[str, dict]) -> dict:
+    """
+    evaluate_jsonnet off the event loop, with a time limit.
+
+    Jsonnet comes from the LLM and can be arbitrarily expensive. The C extension
+    releases the GIL, so other tool calls keep running meanwhile. On timeout the
+    worker thread still runs to completion in the background.
+    Raises ImportError / ValueError like evaluate_jsonnet.
+    """
+    if isinstance(value, dict):
+        return value
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(evaluate_jsonnet, value), timeout=_JSONNET_TIMEOUT)
+    except TimeoutError:
+        raise ValueError(f"Jsonnet evaluation timed out after {_JSONNET_TIMEOUT}s.")
 
 
 _MISSING = object()  # sentinel for missing values

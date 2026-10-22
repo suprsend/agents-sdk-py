@@ -1,7 +1,5 @@
 import asyncio
 
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 from pydantic import BaseModel, Field
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
@@ -17,6 +15,10 @@ def _run_mcp_search(query: str) -> str:
     Called via asyncio.to_thread() to keep blocking MCP transport calls
     off the main event loop.
     """
+    # Imported here so the toolkit imports without the optional `mcp` extra.
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
+
     async def _call():
         async with streamable_http_client(MINTLIFY_MCP_URL) as (read, write, _):
             async with ClientSession(read, write) as session:
@@ -65,5 +67,7 @@ class SearchDocsTool(SuprSendTool):
 
         try:
             return await asyncio.to_thread(_run_mcp_search, query)
+        except ImportError:
+            return "Docs search is unavailable: install the 'mcp' extra (pip install 'suprsend-agents-toolkit[mcp]')."
         except Exception as e:
             return f"Error searching docs: {e}"

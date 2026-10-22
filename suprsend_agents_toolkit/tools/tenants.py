@@ -118,8 +118,11 @@ class GetTenantPreferenceTool(SuprSendTool):
 
         try:
             sdk = await client.get_sdk_instance(ws)
+            options = {"limit": limit, "offset": offset}
+            if tags:
+                options["tags"] = tags
             result = await asyncio.to_thread(
-                sdk.tenants.get_all_categories_preference, tenant_id, limit, offset, tags
+                sdk.tenants.list_preference_categories, tenant_id, options
             )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -302,7 +305,7 @@ class UpdateTenantPreferenceCategoryTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(
-                sdk.tenants.update_category_preference, tenant_id, category, payload
+                sdk.tenants.update_preference_category, tenant_id, category, payload
             )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:

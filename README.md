@@ -25,6 +25,11 @@ pip install "suprsend-agents-toolkit[langchain]"
 uv add "suprsend-agents-toolkit[langchain]"
 ```
 
+**Optional extras:** `mcp` enables `search_suprsend_docs`, and `jsonnet` enables Jsonnet payloads. Without them, those features return an error message instead of failing at import time.
+```bash
+pip install "suprsend-agents-toolkit[langchain,mcp,jsonnet]"
+```
+
 ## Quick Start
 
 ```python
@@ -232,17 +237,17 @@ recipients = [
 
 ### Update preference categories
 
-`update_preference_category` is a **full override**. Always fetch the current tree with `get_preference_categories` first, modify the target category, then POST the complete tree back. All three root categories (`system`, `transactional`, `promotional`) must be present.
+`update_preference_category` is a **full override** of the draft. Always fetch the current **draft** tree with `get_preference_categories(mode="draft")` first, modify the target category, then POST the complete tree back. Fetching the live tree instead would wipe other unpublished draft edits. All three root categories (`system`, `transactional`, `promotional`) must be present.
 
 ```python
-# Step 1: fetch current tree
-current = toolkit.run_tool("get_preference_categories", {"workspace": "my-ws"})
+# Step 1: fetch current draft tree
+current = await toolkit.run_tool("get_preference_categories", {"workspace": "my-ws", "mode": "draft"})
 
 # Step 2: modify target category in the tree, then:
 root_categories = current["root_categories"]  # modify in place
 
 # Step 3: save
-toolkit.run_tool("update_preference_category", {
+await toolkit.run_tool("update_preference_category", {
     "root_categories": root_categories,
     "commit": True,
     "commit_message": "Update marketing category defaults",
@@ -280,6 +285,7 @@ toolkit = SuprSendToolkit(
         management={
             "workflows": {"read": True, "manage": True},
             "preference_categories": {"read": True, "manage": True},
+            "templates": {"read": True, "manage": True},
             "translations": {"read": True, "manage": True},
             "events": {"read": True},
         },
