@@ -116,6 +116,36 @@ Hit `hub.suprsend.com` via HMAC-signed SDK credentials.
 |------|-------------|------------|
 | `track_event` | Track a named event for a user | `events.trigger` |
 | `validate_schema` | Validate an event payload against its registered schema | `events.read` |
+| `create_event` | Create a new event definition in the workspace | `management.events.manage` |
+
+**Lists**
+
+| Tool | Description | Permission |
+|------|-------------|------------|
+| `add_user_to_list` | Add users to a subscriber list | `lists.manage` |
+| `remove_user_from_list` | Remove users from a subscriber list | `lists.manage` |
+
+**Dynamic lists & sync tasks**
+
+A dynamic list is filled by a sync task that runs a SQL query. Sync task tools take a `list_id` and look up the list's sync task for you.
+
+| Tool | Description | Permission |
+|------|-------------|------------|
+| `list_dynamic_lists` | List subscriber lists, filtered by `list_id`, `list_type`, or enabled state | `lists.read` |
+| `get_list_subscribers` | Show the subscribers currently in a list | `lists.read` |
+| `get_sync_task_schema` | Show the tables and columns available for sync queries | `lists.read` |
+| `dry_run_sync_query` | Preview a SQL query's sample rows and total count (60s timeout) | `lists.read` |
+| `get_sync_task` | Get a sync task's state, last run, and current status | `lists.read` |
+| `get_sync_task_active` | Get the live (published) query version | `lists.read` |
+| `get_sync_task_draft` | Get the unpublished draft query version | `lists.read` |
+| `get_sync_task_executions` | List past sync runs, newest first | `lists.read` |
+| `create_dynamic_list` | Create a dynamic list backed by a sync task | `lists.manage` |
+| `update_sync_task_draft` | Save a SQL query to the draft (does not go live) | `lists.manage` |
+| `publish_sync_task` | Make the saved draft the active version | `lists.manage` |
+| `run_sync_now` | Start a sync run immediately | `lists.manage` |
+| `toggle_sync_task` | Enable or disable scheduled syncs | `lists.manage` |
+
+Typical flow: `create_dynamic_list` → `get_sync_task_schema` → `dry_run_sync_query` → `update_sync_task_draft` → `publish_sync_task` → `run_sync_now` → `get_list_subscribers`.
 
 ---
 
@@ -277,11 +307,12 @@ toolkit = SuprSendToolkit(
         tenants={"read": True, "manage": True},
         workflows={"trigger": True},
         events={"read": True, "trigger": True},
+        lists={"read": True, "manage": True},
         management={
             "workflows": {"read": True, "manage": True},
             "preference_categories": {"read": True, "manage": True},
             "translations": {"read": True, "manage": True},
-            "events": {"read": True},
+            "events": {"read": True, "manage": True},
         },
     ),
 )
@@ -311,6 +342,8 @@ result = await toolkit.run_tool(
     run_config=run_config,  # optional — pass when using jwt_getter
 )
 ```
+
+`run_tool` validates `args` against the tool's input schema first. Invalid args come back as an error string so the model can fix them and retry.
 
 ## LangGraph Example
 

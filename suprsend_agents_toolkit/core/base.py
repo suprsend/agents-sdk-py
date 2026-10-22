@@ -119,6 +119,7 @@ class SuprSendTool(ABC):
         - SuprsendAPIException: status code + API message/detail (e.g. query
           validation errors) so the model can correct and retry
         - aiohttp.ClientResponseError: status code only (URL stripped)
+        - TimeoutError: "Timed out: <context>"
         - All others: generic message without the raw exception string
         """
         try:
@@ -140,7 +141,24 @@ class SuprSendTool(ABC):
         try:
             from suprsend.exception import SuprsendAPIException
             if isinstance(exc, SuprsendAPIException):
-                detail = getattr(exc, "message", "") or ""
+                # exc.message is response.text for non-JSON bodies (HTML error
+                # pages, tracebacks) and "None" for JSON without message/detail,
+                # so read the detail from a JSON body only.
+                detail = ""
+                resp = getattr(exc, "response", None)
+                if resp is not None and "application/json" in (resp.headers.get("Content-Type") or ""):
+                    try:
+                        body = resp.json()
+                    except ValueError:
+                        body = None
+                    if isinstance(body, dict):
+                        err = body.get("error")
+                        detail = (
+                            body.get("message")
+                            or body.get("detail")
+                            or (err.get("message") if isinstance(err, dict) else err)
+                            or ""
+                        )
                 status = getattr(exc, "status_code", "")
                 if detail:
                     return f"API error {status}: {detail}"
@@ -153,6 +171,8 @@ class SuprSendTool(ABC):
                 return f"API error {exc.status}: {context}"
         except ImportError:
             pass
+        if isinstance(exc, TimeoutError):
+            return f"Timed out: {context}"
         return f"Unexpected error: {context}"
 
     # ── Policy enforcement ────────────────────────────────────────────────────

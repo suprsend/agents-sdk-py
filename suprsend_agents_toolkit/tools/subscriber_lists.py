@@ -177,8 +177,8 @@ class ListDynamicListsInput(BaseModel):
     list_type: str = Field(
         default="dynamic_list",
         description=(
-            "Accepted for compatibility but NOT applied server-side — this endpoint "
-            "does not support filtering by list type, so results may include other list types."
+            "Only return lists of this type (default 'dynamic_list'). Pass '' for all types. "
+            "Filtered after pagination, so a page may hold fewer than `limit` lists."
         ),
     )
     limit: int = Field(
@@ -236,6 +236,14 @@ class ListDynamicListsTool(SuprSendTool):
             result = await asyncio.to_thread(
                 sdk.subscriber_sync.list_lists, list_type, limit, offset, list_id, is_enabled,
             )
+            # The endpoint ignores list_type, so filter here. Items without a
+            # list_type field are kept rather than silently dropped.
+            items = result.get("results") if isinstance(result, dict) else None
+            if list_type and isinstance(items, list):
+                result["results"] = [
+                    i for i in items
+                    if not isinstance(i, dict) or i.get("list_type", list_type) == list_type
+                ]
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, "listing dynamic lists")

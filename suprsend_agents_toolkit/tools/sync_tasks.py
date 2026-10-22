@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
+# SDK requests carry no timeout, and dry runs execute LLM-written SQL, so cap
+# how long the tool waits. The worker thread still finishes in the background.
+_DRY_RUN_TIMEOUT = 60  # seconds
+
 
 async def _resolve_sync_task_id(sdk, list_id: str) -> str:
     """Resolve a list_id to its sync_task id.
@@ -121,9 +125,12 @@ class DryRunSyncQueryTool(SuprSendTool):
             return "Error: query_text is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            rows_result, count_result = await asyncio.gather(
-                asyncio.to_thread(sdk.subscriber_sync.dry_run, query_text),
-                asyncio.to_thread(sdk.subscriber_sync.dry_run_count, query_text),
+            rows_result, count_result = await asyncio.wait_for(
+                asyncio.gather(
+                    asyncio.to_thread(sdk.subscriber_sync.dry_run, query_text),
+                    asyncio.to_thread(sdk.subscriber_sync.dry_run_count, query_text),
+                ),
+                timeout=_DRY_RUN_TIMEOUT,
             )
             combined = {
                 "sample_data": rows_result.get("data", []),
@@ -308,7 +315,7 @@ class UpdateSyncTaskDraftInput(BaseModel):
         ),
     )
     column_mappings: list = Field(
-        default=[],
+        default_factory=list,
         description="Optional column mappings for profile sync. Leave empty for standard distinct_id-only queries.",
     )
     workspace: str = Field(
@@ -339,7 +346,7 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
         list_id: str = "",
         query_text: str = "",
         update_type: str = "replace",
-        column_mappings: list = [],
+        column_mappings: list | None = None,
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -355,7 +362,7 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
             if not sync_task_id:
                 return f"Error: list '{list_id}' has no associated sync task."
             result = await asyncio.to_thread(
-                sdk.subscriber_sync.update_task_draft, sync_task_id, query_text, update_type, column_mappings,
+                sdk.subscriber_sync.update_task_draft, sync_task_id, query_text, update_type, column_mappings or [],
             )
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -498,7 +505,7 @@ class ToggleSyncTaskTool(SuprSendTool):
         self,
         client: AsyncSuprSendClient,
         list_id: str = "",
-        is_enabled: bool = True,
+        is_enabled: bool | None = None,
         **kwargs,
     ) -> str:
         ws = self._workspace(client, kwargs)
@@ -506,6 +513,8 @@ class ToggleSyncTaskTool(SuprSendTool):
             return "Error: workspace is required."
         if not list_id:
             return "Error: list_id is required."
+        if is_enabled is None:
+            return "Error: is_enabled is required (true to enable, false to disable)."
         try:
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)

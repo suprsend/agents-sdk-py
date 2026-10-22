@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from typing import Any
+from pydantic import ValidationError
 from suprsend_agents_toolkit.auth import ServiceTokenAuth, JWTAuth
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.context import ToolContext
@@ -346,6 +347,8 @@ class SuprSendToolkit:
 
         Returns:
             The tool's string output, ready to send back to the model.
+            Args that fail the tool's args_schema return an error string
+            (not an exception) so the model can correct and retry.
 
         Raises:
             ValueError: if name is not a registered tool or is not permitted.
@@ -359,6 +362,27 @@ class SuprSendToolkit:
         else:
             valid = sorted(_BUILTIN_TOOLS.keys()) + sorted(_ALL_TOOLS.keys())
             raise ValueError(f"Unknown tool: {name!r}. Valid names: {valid}")
+
+        # Run the same args_schema validation LangChain applies, so validators
+        # (JSON-string parsing, coercion, Literal checks) also run on this path.
+        try:
+            validated = instance.args_schema.model_validate(args)
+        except ValidationError as e:
+            problems = "; ".join(
+                f"{'.'.join(str(p) for p in err['loc']) or 'args'}: {err['msg']}"
+                for err in e.errors()
+            )
+            return f"Invalid arguments for {name}: {problems}"
+        # Like LangChain, pass only the keys the model sent, with validated values.
+        fields = type(validated).model_fields
+        kwargs = {k: getattr(validated, k) for k in args if k in fields}
+
         client = instance._resolve_client(run_config)
         instance._enforce_policy(client)
-        return await instance.execute(client=client, **args)
+        try:
+            result = await instance.execute(client=client, **kwargs)
+            return result[0] if isinstance(result, tuple) else result
+        finally:
+            # JWT-derived clients own their own aiohttp session.
+            if client is not instance._client:
+                await client.close()
