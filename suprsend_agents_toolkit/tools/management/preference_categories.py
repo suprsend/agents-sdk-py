@@ -3,6 +3,8 @@ import yaml
 
 import json
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
@@ -14,9 +16,12 @@ class GetPreferenceCategoriesInput(BaseModel):
         default="",
         description="Workspace slug. Uses configured default if omitted.",
     )
-    mode: str = Field(
+    mode: Literal["live", "draft"] = Field(
         default="live",
-        description='Which version to fetch: "live" (published) or "draft" (unpublished changes). Defaults to "live".',
+        description=(
+            'Which version to fetch: "live" (published) or "draft" (unpublished changes). Defaults to "live". '
+            'Use "draft" when you will save the tree back with update_preference_category.'
+        ),
     )
 
 
@@ -67,9 +72,10 @@ class UpdatePreferenceCategoryInput(BaseModel):
         description=(
             "Full preference category tree to save. Must include all three root categories: "
             "'system', 'transactional', and 'promotional'. "
-            "IMPORTANT: This is a full override — always call get_preference_categories first "
-            "to fetch the current tree, modify the target category inside it, then pass the "
-            "complete modified tree here. Omitting a root category will delete it."
+            "IMPORTANT: This is a full override — always call get_preference_categories with "
+            "mode='draft' first to fetch the current draft tree (so other unpublished edits are kept), "
+            "modify the target category inside it, then pass the complete modified tree here. "
+            "Omitting a root category will delete it."
         ),
     )
     commit: bool = Field(
@@ -99,9 +105,9 @@ class UpdatePreferenceCategoryTool(ManagementTool):
     name = "update_preference_category"
     description = (
         "Save an updated preference category tree for a workspace. "
-        "This is a FULL OVERRIDE — always call get_preference_categories first to get the "
-        "current tree, modify only the specific category you want to change, then pass the "
-        "complete tree back here. "
+        "This is a FULL OVERRIDE — always call get_preference_categories with mode='draft' first "
+        "to get the current draft tree (fetching 'live' would discard other unpublished draft edits), "
+        "modify only the specific category you want to change, then pass the complete tree back here. "
         "Each category supports: category (slug), name, description, "
         "default_preference ('opt_in' | 'opt_out' | 'cant_unsubscribe'), "
         "default_mandatory_channels (list of specific channels — omit or leave empty for all channels), "

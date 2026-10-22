@@ -63,7 +63,7 @@ class ListTemplatesTool(ManagementTool):
     )
     args_schema = ListTemplatesInput
     permission_subcategory = "templates"
-    permission_operation = "view"
+    permission_operation = "read"
     read_only = True
     destructive = False
     idempotent = True
@@ -120,7 +120,7 @@ class GetTemplateTool(ManagementTool):
     )
     args_schema = GetTemplateInput
     permission_subcategory = "templates"
-    permission_operation = "view"
+    permission_operation = "read"
     read_only = True
     destructive = False
     idempotent = True
@@ -156,7 +156,7 @@ class GetTemplateTool(ManagementTool):
 class GetTemplateVariantsInput(BaseModel):
     template_slug: str = Field(description="Slug of the template.")
     mode: Literal["draft", "live"] = Field(default="draft", description="Which version to read from.")
-    channel: str | None = Field(default=None, description="Filter to a specific channel (email, sms, whatsapp, androidpush, iospush, webpush, inbox, slack, msteams, webhook).")
+    channel: str | None = Field(default=None, description="Filter to a specific channel (email, sms, whatsapp, androidpush, iospush, webpush, inbox, slack, ms_teams, webhook).")
     include_content: bool = Field(default=False, description="Include full channel content in each variant. Omit for summary-only (faster).")
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
 
@@ -173,7 +173,7 @@ class GetTemplateVariantsTool(ManagementTool):
     )
     args_schema = GetTemplateVariantsInput
     permission_subcategory = "templates"
-    permission_operation = "view"
+    permission_operation = "read"
     read_only = True
     destructive = False
     idempotent = True
@@ -230,7 +230,7 @@ class GetVariantContentTool(ManagementTool):
     )
     args_schema = GetVariantContentInput
     permission_subcategory = "templates"
-    permission_operation = "view"
+    permission_operation = "read"
     read_only = True
     destructive = False
     idempotent = True
@@ -285,7 +285,7 @@ class GetTemplateVersionsTool(ManagementTool):
     )
     args_schema = GetTemplateVersionsInput
     permission_subcategory = "templates"
-    permission_operation = "view"
+    permission_operation = "read"
     read_only = True
     destructive = False
     idempotent = True
@@ -334,7 +334,7 @@ class GetMockDataTool(ManagementTool):
     )
     args_schema = GetMockDataInput
     permission_subcategory = "templates"
-    permission_operation = "view"
+    permission_operation = "read"
     read_only = True
     destructive = False
     idempotent = True
@@ -512,7 +512,7 @@ class ValidateTemplateTool(ManagementTool):
         "Email content shape — body must always be an object, never a plain string:\n"
         '  {"subject": "Hello {{user.name}}", "body": {"type": "raw", "raw": {"html": "<p>Hi</p>"}}}\n\n'
         "mock_data validation behavior per channel:\n"
-        "  - email, sms (standard), androidpush, iospush, webpush, inbox, slack, msteams, webhook: mock_data is NOT validated — "
+        "  - email, sms (standard), androidpush, iospush, webpush, inbox, slack, ms_teams, webhook: mock_data is NOT validated — "
         "include it for rendering previews only, errors will never be raised against it.\n"
         "  - sms (DLT, needs_vendor_approval=true): mock_data IS validated — empty rendered variables "
         "raise errors on body.\n"
@@ -582,7 +582,7 @@ class UpsertTemplateInput(BaseModel):
         default_factory=list,
         description=(
             "Channels this template supports. Accepted values: "
-            "email, sms, whatsapp, androidpush, iospush, webpush, inbox, slack, msteams, webhook."
+            "email, sms, whatsapp, androidpush, iospush, webpush, inbox, slack, ms_teams, webhook."
         ),
     )
     workspace: str = Field(default="", description="Workspace slug. Uses configured default if omitted.")
@@ -946,8 +946,9 @@ class PreCommitValidateTemplateTool(ManagementTool):
     )
     args_schema = PreCommitValidateTemplateInput
     permission_subcategory = "templates"
-    permission_operation = "read"
-    read_only = True
+    # The endpoint writes intermediate draft state, so it is not read-only.
+    permission_operation = "manage"
+    read_only = False
     destructive = False
     idempotent = False
 

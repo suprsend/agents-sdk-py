@@ -1,5 +1,6 @@
 import json
 from typing import Literal
+from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
@@ -7,11 +8,21 @@ from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
 
 
+def _path_segment(value: str) -> str:
+    """Quote one URL path segment. Returns "" for '.' / '..', which URLs collapse."""
+    return "" if value in (".", "..") else quote(value, safe="")
+
+
 # ── DraftTriggerWorkflowTool ──────────────────────────────────────────────────
 
 class DraftTriggerWorkflowInput(BaseModel):
     workflow_slug: str = Field(description="Slug of the workflow to test.")
-    version_id: str = Field(description="Workflow version ULID to run (from list_workflow_versions).")
+    version_id: str = Field(
+        description=(
+            "Workflow version ULID to run. No toolkit tool lists workflow versions, so ask the user "
+            "for it (shown in the workflow's version history in the SuprSend dashboard). Never guess it."
+        ),
+    )
     trigger_type: Literal["api", "event"] = Field(description="How the workflow is triggered.")
     data: dict = Field(default_factory=dict, description="Template variable substitution data.")
 
@@ -91,10 +102,14 @@ class DraftTriggerWorkflowTool(ManagementTool):
         if tenant_id:
             body["tenant_id"] = tenant_id
 
+        ws_seg, slug_seg = _path_segment(ws), _path_segment(workflow_slug)
+        if not (ws_seg and slug_seg):
+            return "Error: invalid workspace or workflow_slug.", {}
+
         try:
             result = await self._mgmnt_post(
                 client,
-                f"/v2/{ws}/workflow/{workflow_slug}/test_run/",
+                f"/v2/{ws_seg}/workflow/{slug_seg}/test_run/",
                 body,
             )
             return json.dumps(result), result
@@ -171,10 +186,14 @@ class TestTemplateTool(ManagementTool):
         if variant:
             body["variant"] = variant
 
+        ws_seg, slug_seg = _path_segment(ws), _path_segment(template_slug)
+        if not (ws_seg and slug_seg):
+            return "Error: invalid workspace or template_slug.", {}
+
         try:
             result = await self._mgmnt_post(
                 client,
-                f"/v2/{ws}/template/{template_slug}/mock_test/",
+                f"/v2/{ws_seg}/template/{slug_seg}/mock_test/",
                 body,
                 params={"mode": mode},
             )

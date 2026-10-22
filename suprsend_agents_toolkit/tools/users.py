@@ -614,7 +614,7 @@ class UpdateUserPreferenceChannelTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(
-                sdk.users.update_channel_preference,
+                sdk.users.update_global_channels_preference,
                 distinct_id,
                 {"channel_preferences": channel_preferences},
             )

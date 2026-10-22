@@ -6,6 +6,7 @@ from typing import Any
 
 from suprsend_agents_toolkit.auth import JWTAuth
 from suprsend_agents_toolkit.core.base import SuprSendTool
+from suprsend_management.exception import SuprsendManagementException
 
 
 class ManagementTool(SuprSendTool):
@@ -69,12 +70,30 @@ class ManagementTool(SuprSendTool):
         return client.get_management_instance(), self._mgmnt_headers(client)
 
     async def _mgmnt_post(self, client: Any, path: str, payload: dict, params: dict | None = None) -> Any:
-        """Direct async POST to the management API for endpoints not yet in the SDK."""
+        """
+        Direct async POST to the management API for endpoints not yet in the SDK.
+        Callers must quote() any user-supplied path segments.
+
+        Errors are raised as SuprsendManagementException (like the SDK calls) so
+        _api_error passes the server's detail/message back to the model.
+        """
         url = f"{client.mgmnt_url}{path}"
         headers = self._mgmnt_headers(client)
         body = json.dumps(payload).encode()
         async with client._get_session().post(url, data=body, headers=headers, params=params) as resp:
-            resp.raise_for_status()
+            if resp.status >= 400:
+                raise SuprsendManagementException(_ErrorResponse(resp.status, await resp.text()))
             return await resp.json()
 
     # _api_error is inherited from SuprSendTool.
+
+
+class _ErrorResponse:
+    """The parts of requests.Response that SuprsendManagementException reads."""
+
+    def __init__(self, status_code: int, text: str) -> None:
+        self.status_code = status_code
+        self.text = text
+
+    def json(self) -> Any:
+        return json.loads(self.text)

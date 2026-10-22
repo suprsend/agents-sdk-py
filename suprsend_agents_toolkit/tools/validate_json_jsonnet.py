@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
+from suprsend_agents_toolkit.tools._utils import evaluate_jsonnet_async
 
 
 class ValidateJsonJsonnetInput(BaseModel):
@@ -44,12 +45,7 @@ class ValidateJsonJsonnetTool(SuprSendTool):
 
         # Try Jsonnet
         try:
-            import _gojsonnet as jsonnet
-
-            def _block_import(base: str, rel: str) -> tuple[str, str]:
-                raise RuntimeError(f"Jsonnet import not permitted: '{rel}'.")
-
-            jsonnet.evaluate_snippet("validate", content, import_callback=_block_import)
+            await evaluate_jsonnet_async(content)
             return json.dumps({"valid": True, "format": "jsonnet"})
         except ImportError:
             return json.dumps({

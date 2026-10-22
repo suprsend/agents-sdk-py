@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.management import ManagementTool
-from suprsend_agents_toolkit.tools._utils import evaluate_jsonnet, validate_with_jsonpath
+from suprsend_agents_toolkit.tools._utils import evaluate_jsonnet_async, validate_with_jsonpath
 
 
 class ValidateSchemaInput(BaseModel):
@@ -69,7 +69,7 @@ class ValidateSchemaTool(ManagementTool):
 
         # Evaluate Jsonnet if needed
         try:
-            data = evaluate_jsonnet(data)
+            data = await evaluate_jsonnet_async(data)
         except (ImportError, ValueError) as e:
             return f"Error evaluating data: {e}"
 
