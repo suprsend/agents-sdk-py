@@ -233,10 +233,12 @@ class ListDynamicListsTool(SuprSendTool):
             return "Error: workspace is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(
-                sdk.subscriber_sync.list_lists,
-                limit=limit, offset=offset, list_id=list_id, is_enabled=is_enabled,
-            )
+            options = {}
+            if list_id:
+                options["list_id"] = list_id
+            if is_enabled:
+                options["is_enabled"] = is_enabled
+            result = await asyncio.to_thread(sdk.subscriber_lists.get_all, limit, offset, options)
             # The endpoint can't filter by list_type, so filter here. Items
             # without a list_type field are kept rather than silently dropped.
             items = result.get("results") if isinstance(result, dict) else None
