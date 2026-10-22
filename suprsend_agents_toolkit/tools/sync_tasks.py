@@ -22,63 +22,9 @@ async def _resolve_sync_task_id(sdk, list_id: str) -> str:
 def _no_sync_task(list_id: str) -> str:
     return (
         f"Error: list '{list_id}' has no associated sync task. "
-        "Call create_sync_task to create one."
+        "Only dynamic lists have one (it is created with the list); "
+        "check the list's list_type with list_dynamic_lists."
     )
-
-
-# ── CreateSyncTaskTool ────────────────────────────────────────────────────────
-
-class CreateSyncTaskInput(BaseModel):
-    list_id: str = Field(
-        description="Required. list_id of the dynamic list the sync task will populate."
-    )
-    name: str = Field(
-        default="",
-        description="Optional display name for the sync task. Defaults to the list_id.",
-    )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
-
-
-class CreateSyncTaskTool(SuprSendTool):
-    """POST /v1/subscriber_sync_task/"""
-
-    name = "create_sync_task"
-    description = (
-        "Create the sync task for a dynamic list that does not have one yet. "
-        "Only needed when another sync task tool reports that the list has no associated sync task. "
-        "Afterwards, use update_sync_task_draft and publish_sync_task to set its query."
-    )
-    args_schema = CreateSyncTaskInput
-    permission_category = "lists"
-    permission_operation = "manage"
-    read_only = False
-    destructive = False
-    idempotent = False
-
-    async def execute(
-        self,
-        client: AsyncSuprSendClient,
-        list_id: str = "",
-        name: str = "",
-        **kwargs,
-    ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
-        if not list_id:
-            return "Error: list_id is required."
-        try:
-            sdk = await client.get_sdk_instance(ws)
-            existing = await _resolve_sync_task_id(sdk, list_id)
-            if existing:
-                return f"Error: list '{list_id}' already has sync task '{existing}'."
-            result = await asyncio.to_thread(sdk.subscriber_sync.create_sync_task, name or list_id, list_id)
-            return yaml.dump(result, default_flow_style=False), result
-        except Exception as e:
-            return self._api_error(e, f"creating sync task for list '{list_id}'")
 
 
 # ── GetSyncTaskActiveTool ─────────────────────────────────────────────────────

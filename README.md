@@ -127,7 +127,7 @@ Hit `hub.suprsend.com` via HMAC-signed SDK credentials.
 
 **Dynamic lists & sync tasks**
 
-A dynamic list is filled by a sync task that runs a SQL query. Sync task tools take a `list_id` and look up the list's sync task for you.
+A dynamic list is filled by a sync task that runs a SQL query. The sync task is created along with the list. Sync task tools take a `list_id` and look up the list's sync task for you.
 
 | Tool | Description | Permission |
 |------|-------------|------------|
@@ -139,7 +139,6 @@ A dynamic list is filled by a sync task that runs a SQL query. Sync task tools t
 | `get_sync_task_active` | Get the live (published) query version | `lists.read` |
 | `get_sync_task_draft` | Get the unpublished draft query version | `lists.read` |
 | `create_dynamic_list` | Create a dynamic list | `lists.manage` |
-| `create_sync_task` | Create the sync task for a list that has none | `lists.manage` |
 | `update_sync_task_draft` | Save a SQL query to the draft (does not go live) | `lists.manage` |
 | `publish_sync_task` | Make the saved draft the active version | `lists.manage` |
 | `run_sync_now` | Start a sync run immediately | `lists.manage` |
