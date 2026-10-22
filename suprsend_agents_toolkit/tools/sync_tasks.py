@@ -23,6 +23,68 @@ async def _resolve_sync_task_id(sdk, list_id: str) -> str:
     return ((detail or {}).get("sync_task") or {}).get("id") or ""
 
 
+def _no_sync_task(list_id: str) -> str:
+    return (
+        f"Error: list '{list_id}' has no associated sync task. "
+        "Call create_sync_task to create one."
+    )
+
+
+# ── CreateSyncTaskTool ────────────────────────────────────────────────────────
+
+class CreateSyncTaskInput(BaseModel):
+    list_id: str = Field(
+        description="Required. list_id of the dynamic list the sync task will populate."
+    )
+    name: str = Field(
+        default="",
+        description="Optional display name for the sync task. Defaults to the list_id.",
+    )
+    workspace: str = Field(
+        default="",
+        description="Workspace slug. Uses configured default if omitted.",
+    )
+
+
+class CreateSyncTaskTool(SuprSendTool):
+    """POST /v1/subscriber_sync_task/"""
+
+    name = "create_sync_task"
+    description = (
+        "Create the sync task for a dynamic list that does not have one yet. "
+        "Only needed when another sync task tool reports that the list has no associated sync task. "
+        "Afterwards, use update_sync_task_draft and publish_sync_task to set its query."
+    )
+    args_schema = CreateSyncTaskInput
+    permission_category = "lists"
+    permission_operation = "manage"
+    read_only = False
+    destructive = False
+    idempotent = False
+
+    async def execute(
+        self,
+        client: AsyncSuprSendClient,
+        list_id: str = "",
+        name: str = "",
+        **kwargs,
+    ) -> str:
+        ws = self._workspace(client, kwargs)
+        if not ws:
+            return "Error: workspace is required."
+        if not list_id:
+            return "Error: list_id is required."
+        try:
+            sdk = await client.get_sdk_instance(ws)
+            existing = await _resolve_sync_task_id(sdk, list_id)
+            if existing:
+                return f"Error: list '{list_id}' already has sync task '{existing}'."
+            result = await asyncio.to_thread(sdk.subscriber_sync.create_sync_task, name or list_id, list_id)
+            return yaml.dump(result, default_flow_style=False), result
+        except Exception as e:
+            return self._api_error(e, f"creating sync task for list '{list_id}'")
+
+
 # ── GetSyncTaskActiveTool ─────────────────────────────────────────────────────
 
 class GetSyncTaskActiveInput(BaseModel):
@@ -66,7 +128,7 @@ class GetSyncTaskActiveTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(sdk.subscriber_sync.get_task_active_version, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -185,7 +247,7 @@ class GetSyncTaskTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(sdk.subscriber_sync.get_task, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -234,7 +296,7 @@ class GetSyncTaskDraftTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(sdk.subscriber_sync.get_task_draft, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -360,7 +422,7 @@ class UpdateSyncTaskDraftTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(
                 sdk.subscriber_sync.update_task_draft, sync_task_id, query_text, update_type, column_mappings or [],
             )
@@ -413,7 +475,7 @@ class PublishSyncTaskTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(sdk.subscriber_sync.publish_task, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -463,7 +525,7 @@ class RunSyncNowTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(sdk.subscriber_sync.run_now, sync_task_id)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
@@ -519,7 +581,7 @@ class ToggleSyncTaskTool(SuprSendTool):
             sdk = await client.get_sdk_instance(ws)
             sync_task_id = await _resolve_sync_task_id(sdk, list_id)
             if not sync_task_id:
-                return f"Error: list '{list_id}' has no associated sync task."
+                return _no_sync_task(list_id)
             result = await asyncio.to_thread(sdk.subscriber_sync.toggle_task, sync_task_id, is_enabled)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:

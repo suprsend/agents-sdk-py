@@ -76,6 +76,7 @@ from suprsend_agents_toolkit.tools.subscriber_lists import (
     GetListSubscribersTool,
 )
 from suprsend_agents_toolkit.tools.sync_tasks import (
+    CreateSyncTaskTool,
     GetSyncTaskActiveTool,
     DryRunSyncQueryTool,
     GetSyncTaskTool,
@@ -157,6 +158,7 @@ _ALL_TOOLS: dict[str, type] = {
     "get_sync_task": GetSyncTaskTool,
     "get_sync_task_draft": GetSyncTaskDraftTool,
     "get_sync_task_executions": GetSyncTaskExecutionsTool,
+    "create_sync_task": CreateSyncTaskTool,
     "update_sync_task_draft": UpdateSyncTaskDraftTool,
     "publish_sync_task": PublishSyncTaskTool,
     "run_sync_now": RunSyncNowTool,

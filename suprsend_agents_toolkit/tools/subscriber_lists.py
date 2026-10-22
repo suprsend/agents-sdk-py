@@ -127,10 +127,10 @@ class CreateDynamicListTool(SuprSendTool):
 
     name = "create_dynamic_list"
     description = (
-        "Create a new dynamic subscriber list. The list is automatically backed by a sync task "
-        "that can be configured with a SQL query to populate members. "
-        "After creating the list, use dry_run_sync_query to validate a query, "
-        "then update_sync_task_draft and publish_sync_task to make it live."
+        "Create a new dynamic subscriber list. Members are filled by the list's sync task, "
+        "which runs a SQL query. After creating the list, use dry_run_sync_query to validate a query, "
+        "then update_sync_task_draft and publish_sync_task to make it live. "
+        "If those tools report that the list has no sync task, call create_sync_task first."
     )
     args_schema = CreateDynamicListInput
     permission_category = "lists"

@@ -139,7 +139,8 @@ A dynamic list is filled by a sync task that runs a SQL query. Sync task tools t
 | `get_sync_task_active` | Get the live (published) query version | `lists.read` |
 | `get_sync_task_draft` | Get the unpublished draft query version | `lists.read` |
 | `get_sync_task_executions` | List past sync runs, newest first | `lists.read` |
-| `create_dynamic_list` | Create a dynamic list backed by a sync task | `lists.manage` |
+| `create_dynamic_list` | Create a dynamic list | `lists.manage` |
+| `create_sync_task` | Create the sync task for a list that has none | `lists.manage` |
 | `update_sync_task_draft` | Save a SQL query to the draft (does not go live) | `lists.manage` |
 | `publish_sync_task` | Make the saved draft the active version | `lists.manage` |
 | `run_sync_now` | Start a sync run immediately | `lists.manage` |
