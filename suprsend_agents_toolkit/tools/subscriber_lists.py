@@ -106,10 +106,16 @@ class CreateDynamicListTool(SuprSendTool):
             return "Error: list_name is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(
-                sdk.subscriber_sync.create_list,
-                list_id, list_name, list_description, track_user_entry, track_user_exit,
-            )
+            payload = {
+                "list_id": list_id,
+                "list_name": list_name,
+                "list_type": "dynamic_list",
+                "track_user_entry": track_user_entry,
+                "track_user_exit": track_user_exit,
+            }
+            if list_description:
+                payload["list_description"] = list_description
+            result = await asyncio.to_thread(sdk.subscriber_lists.create, payload)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"creating dynamic list '{list_id}'")
