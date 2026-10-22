@@ -6,10 +6,6 @@ from pydantic import BaseModel, Field
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.core.base import SuprSendTool
 
-# SDK requests carry no timeout, and dry runs execute LLM-written SQL, so cap
-# how long the tool waits. The worker thread still finishes in the background.
-_DRY_RUN_TIMEOUT = 60  # seconds
-
 
 async def _resolve_sync_task_id(sdk, list_id: str) -> str:
     """Resolve a list_id to its sync_task id.
@@ -187,12 +183,10 @@ class DryRunSyncQueryTool(SuprSendTool):
             return "Error: query_text is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            rows_result, count_result = await asyncio.wait_for(
-                asyncio.gather(
-                    asyncio.to_thread(sdk.subscriber_sync.dry_run, query_text),
-                    asyncio.to_thread(sdk.subscriber_sync.dry_run_count, query_text),
-                ),
-                timeout=_DRY_RUN_TIMEOUT,
+            # The SDK applies a 60s request timeout to these calls.
+            rows_result, count_result = await asyncio.gather(
+                asyncio.to_thread(sdk.subscriber_sync.dry_run, query_text),
+                asyncio.to_thread(sdk.subscriber_sync.dry_run_count, query_text),
             )
             combined = {
                 "sample_data": rows_result.get("data", []),

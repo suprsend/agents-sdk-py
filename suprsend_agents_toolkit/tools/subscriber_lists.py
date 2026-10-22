@@ -23,7 +23,7 @@ class CreateEventInput(BaseModel):
 
 
 class CreateEventTool(SuprSendTool):
-    """POST /v1/staging/event/"""
+    """POST /v1/{workspace}/event/"""
 
     name = "create_event"
     description = (
@@ -52,7 +52,7 @@ class CreateEventTool(SuprSendTool):
             return "Error: name is required."
         try:
             sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.events.create, name, description)
+            result = await asyncio.to_thread(sdk.events.create, name, description, workspace=ws)
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"creating event '{name}'")
@@ -234,10 +234,11 @@ class ListDynamicListsTool(SuprSendTool):
         try:
             sdk = await client.get_sdk_instance(ws)
             result = await asyncio.to_thread(
-                sdk.subscriber_sync.list_lists, list_type, limit, offset, list_id, is_enabled,
+                sdk.subscriber_sync.list_lists,
+                limit=limit, offset=offset, list_id=list_id, is_enabled=is_enabled,
             )
-            # The endpoint ignores list_type, so filter here. Items without a
-            # list_type field are kept rather than silently dropped.
+            # The endpoint can't filter by list_type, so filter here. Items
+            # without a list_type field are kept rather than silently dropped.
             items = result.get("results") if isinstance(result, dict) else None
             if list_type and isinstance(items, list):
                 result["results"] = [
