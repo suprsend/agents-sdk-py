@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from typing import Any
+from pydantic import ValidationError
 from suprsend_agents_toolkit.auth import ServiceTokenAuth, JWTAuth
 from suprsend_agents_toolkit.client import AsyncSuprSendClient
 from suprsend_agents_toolkit.context import ToolContext
@@ -43,6 +44,7 @@ from suprsend_agents_toolkit.tools.management import (
     PushWorkflowTool,
     CommitWorkflowTool,
     GetEventDetailsTool,
+    CreateEventTool,
     GetTranslationDetailsTool,
     UpdateTranslationTool,
     CommitTranslationTool,
@@ -67,6 +69,22 @@ from suprsend_agents_toolkit.tools.management import (
     CommitTemplateTool,
 )
 from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
+from suprsend_agents_toolkit.tools.subscriber_lists import (
+    GetSyncTaskSchemaTool,
+    CreateDynamicListTool,
+    ListDynamicListsTool,
+    GetListSubscribersTool,
+)
+from suprsend_agents_toolkit.tools.sync_tasks import (
+    GetSyncTaskActiveTool,
+    DryRunSyncQueryTool,
+    GetSyncTaskTool,
+    GetSyncTaskDraftTool,
+    UpdateSyncTaskDraftTool,
+    PublishSyncTaskTool,
+    RunSyncNowTool,
+    ToggleSyncTaskTool,
+)
 from suprsend_agents_toolkit.tools.workflow_trigger import TriggerWorkflowTool
 from suprsend_agents_toolkit.tools.event_trigger import TrackEventTool
 from suprsend_agents_toolkit.tools.validate_schema import ValidateSchemaTool
@@ -127,6 +145,20 @@ _ALL_TOOLS: dict[str, type] = {
     # lists
     "add_user_to_list": AddUserToListTool,
     "remove_user_from_list": RemoveUserFromListTool,
+    # dynamic lists & sync tasks
+    "create_event": CreateEventTool,
+    "get_sync_task_schema": GetSyncTaskSchemaTool,
+    "get_sync_task_active": GetSyncTaskActiveTool,
+    "create_dynamic_list": CreateDynamicListTool,
+    "list_dynamic_lists": ListDynamicListsTool,
+    "get_list_subscribers": GetListSubscribersTool,
+    "dry_run_sync_query": DryRunSyncQueryTool,
+    "get_sync_task": GetSyncTaskTool,
+    "get_sync_task_draft": GetSyncTaskDraftTool,
+    "update_sync_task_draft": UpdateSyncTaskDraftTool,
+    "publish_sync_task": PublishSyncTaskTool,
+    "run_sync_now": RunSyncNowTool,
+    "toggle_sync_task": ToggleSyncTaskTool,
     # workflows (trigger)
     "trigger_workflow": TriggerWorkflowTool,
     # events
@@ -313,6 +345,8 @@ class SuprSendToolkit:
 
         Returns:
             The tool's string output, ready to send back to the model.
+            Args that fail the tool's args_schema return an error string
+            (not an exception) so the model can correct and retry.
 
         Raises:
             ValueError: if name is not a registered tool or is not permitted.
@@ -326,6 +360,27 @@ class SuprSendToolkit:
         else:
             valid = sorted(_BUILTIN_TOOLS.keys()) + sorted(_ALL_TOOLS.keys())
             raise ValueError(f"Unknown tool: {name!r}. Valid names: {valid}")
+
+        # Run the same args_schema validation LangChain applies, so validators
+        # (JSON-string parsing, coercion, Literal checks) also run on this path.
+        try:
+            validated = instance.args_schema.model_validate(args)
+        except ValidationError as e:
+            problems = "; ".join(
+                f"{'.'.join(str(p) for p in err['loc']) or 'args'}: {err['msg']}"
+                for err in e.errors()
+            )
+            return f"Invalid arguments for {name}: {problems}"
+        # Like LangChain, pass only the keys the model sent, with validated values.
+        fields = type(validated).model_fields
+        kwargs = {k: getattr(validated, k) for k in args if k in fields}
+
         client = instance._resolve_client(run_config)
         instance._enforce_policy(client)
-        return await instance.execute(client=client, **args)
+        try:
+            result = await instance.execute(client=client, **kwargs)
+            return result[0] if isinstance(result, tuple) else result
+        finally:
+            # JWT-derived clients own their own aiohttp session.
+            if client is not instance._client:
+                await client.close()

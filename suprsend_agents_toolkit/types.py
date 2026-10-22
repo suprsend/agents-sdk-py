@@ -40,6 +40,7 @@ class ManagementPermissions(TypedDict, total=False):
     """
     workflows: ResourcePermissions
     preference_categories: ResourcePermissions
+    events: ResourcePermissions
 
 
 class Permissions(TypedDict, total=False):
@@ -67,6 +68,7 @@ class Permissions(TypedDict, total=False):
     subscribers: ResourcePermissions
     events: ResourcePermissions
     tenants: ResourcePermissions
+    lists: ResourcePermissions
     management: ManagementPermissions
 
 
