@@ -177,8 +177,8 @@ class ListDynamicListsInput(BaseModel):
     list_type: str = Field(
         default="dynamic_list",
         description=(
-            "Only return lists of this type (default 'dynamic_list'). Pass '' for all types. "
-            "Filtered after pagination, so a page may hold fewer than `limit` lists."
+            "Only return lists of these types: 'dynamic_list' (default), 'static_list', "
+            "or both comma-separated ('static_list,dynamic_list'). Pass '' for all types."
         ),
     )
     limit: int = Field(
@@ -238,14 +238,18 @@ class ListDynamicListsTool(SuprSendTool):
                 options["list_id"] = list_id
             if is_enabled:
                 options["is_enabled"] = is_enabled
+            if list_type:
+                options["list_type"] = list_type
             result = await asyncio.to_thread(sdk.subscriber_lists.get_all, limit, offset, options)
-            # The endpoint can't filter by list_type, so filter here. Items
-            # without a list_type field are kept rather than silently dropped.
+            # Servers without list_type support (before suprsend-api#691 is
+            # deployed) ignore the param, so filter here too; this is a no-op
+            # once the server filters. Items without a list_type field are kept.
+            types = {t.strip() for t in list_type.split(",") if t.strip()}
             items = result.get("results") if isinstance(result, dict) else None
-            if list_type and isinstance(items, list):
+            if types and isinstance(items, list):
                 result["results"] = [
                     i for i in items
-                    if not isinstance(i, dict) or i.get("list_type", list_type) == list_type
+                    if not isinstance(i, dict) or "list_type" not in i or i["list_type"] in types
                 ]
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
