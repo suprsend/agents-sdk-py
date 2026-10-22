@@ -214,9 +214,10 @@ class GetSyncTaskTool(SuprSendTool):
 
     name = "get_sync_task"
     description = (
-        "Get the current state of a subscriber list sync task, including its active query version, "
-        "last sync status, last run time, and current execution status. "
-        "Use this to check whether a sync completed successfully."
+        "Get the current state of a subscriber list sync task, including its active query version "
+        "and its latest run: 'current_execution' (status, progress, failure_reason) plus "
+        "last_sync_status, last_sync_failure_reason and last_sync_run_at. "
+        "Use this to check whether a sync completed successfully. Older runs are not available."
     )
     args_schema = GetSyncTaskInput
     permission_category = "lists"
@@ -295,59 +296,6 @@ class GetSyncTaskDraftTool(SuprSendTool):
             return yaml.dump(result, default_flow_style=False), result
         except Exception as e:
             return self._api_error(e, f"fetching draft version for list '{list_id}'")
-
-
-# ── GetSyncTaskExecutionsTool ─────────────────────────────────────────────────
-
-class GetSyncTaskExecutionsInput(BaseModel):
-    list_id: str = Field(
-        description="Required. list_id of the subscriber list."
-    )
-    limit: int = Field(
-        default=10,
-        description="Maximum number of executions to return, ordered newest first (default 10).",
-    )
-    workspace: str = Field(
-        default="",
-        description="Workspace slug. Uses configured default if omitted.",
-    )
-
-
-class GetSyncTaskExecutionsTool(SuprSendTool):
-    """GET /v1/task_request/?list_id={list_id}"""
-
-    name = "get_sync_task_executions"
-    description = (
-        "List the execution history for a subscriber list sync task, ordered newest first. "
-        "Each execution shows its status (created, running, completed, failed, ignored), "
-        "progress, and failure reason if applicable."
-    )
-    args_schema = GetSyncTaskExecutionsInput
-    permission_category = "lists"
-    permission_operation = "read"
-    read_only = True
-    destructive = False
-    idempotent = True
-    open_world = True
-
-    async def execute(
-        self,
-        client: AsyncSuprSendClient,
-        list_id: str = "",
-        limit: int = 10,
-        **kwargs,
-    ) -> str:
-        ws = self._workspace(client, kwargs)
-        if not ws:
-            return "Error: workspace is required."
-        if not list_id:
-            return "Error: list_id is required."
-        try:
-            sdk = await client.get_sdk_instance(ws)
-            result = await asyncio.to_thread(sdk.subscriber_sync.get_task_executions, list_id, limit)
-            return yaml.dump(result, default_flow_style=False), result
-        except Exception as e:
-            return self._api_error(e, f"fetching executions for list '{list_id}'")
 
 
 # ── UpdateSyncTaskDraftTool ───────────────────────────────────────────────────
@@ -495,7 +443,7 @@ class RunSyncNowTool(SuprSendTool):
     description = (
         "Trigger an immediate sync run for a subscriber list. "
         "The sync task must have an active query version (published via publish_sync_task). "
-        "Use get_sync_task or get_sync_task_executions to monitor progress."
+        "Use get_sync_task to monitor progress."
     )
     args_schema = RunSyncNowInput
     permission_category = "lists"

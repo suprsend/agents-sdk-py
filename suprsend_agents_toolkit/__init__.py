@@ -44,6 +44,7 @@ from suprsend_agents_toolkit.tools.management import (
     PushWorkflowTool,
     CommitWorkflowTool,
     GetEventDetailsTool,
+    CreateEventTool,
     GetTranslationDetailsTool,
     UpdateTranslationTool,
     CommitTranslationTool,
@@ -69,7 +70,6 @@ from suprsend_agents_toolkit.tools.management import (
 )
 from suprsend_agents_toolkit.tools.lists import AddUserToListTool, RemoveUserFromListTool
 from suprsend_agents_toolkit.tools.subscriber_lists import (
-    CreateEventTool,
     GetSyncTaskSchemaTool,
     CreateDynamicListTool,
     ListDynamicListsTool,
@@ -81,7 +81,6 @@ from suprsend_agents_toolkit.tools.sync_tasks import (
     DryRunSyncQueryTool,
     GetSyncTaskTool,
     GetSyncTaskDraftTool,
-    GetSyncTaskExecutionsTool,
     UpdateSyncTaskDraftTool,
     PublishSyncTaskTool,
     RunSyncNowTool,
@@ -157,7 +156,6 @@ _ALL_TOOLS: dict[str, type] = {
     "dry_run_sync_query": DryRunSyncQueryTool,
     "get_sync_task": GetSyncTaskTool,
     "get_sync_task_draft": GetSyncTaskDraftTool,
-    "get_sync_task_executions": GetSyncTaskExecutionsTool,
     "create_sync_task": CreateSyncTaskTool,
     "update_sync_task_draft": UpdateSyncTaskDraftTool,
     "publish_sync_task": PublishSyncTaskTool,
